@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WebSocket Test Client - WASM PostgreSQL Learning</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .container {
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            padding: 20px;
+            margin: 10px 0;
+        }
+        .status {
+            padding: 10px;
+            border-radius: 3px;
+            margin: 10px 0;
+        }
+        .connected { background-color: #d4edda; color: #155724; }
+        .disconnected { background-color: #f8d7da; color: #721c24; }
+        .message {
+            background-color: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 3px;
+            padding: 10px;
+            margin: 5px 0;
+            font-family: monospace;
+        }
+        button {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            border-radius: 3px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover { background-color: #0056b3; }
+        button:disabled { background-color: #6c757d; cursor: not-allowed; }
+        input, textarea {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ccc;
+            border-radius: 3px;
+            margin: 5px 0;
+        }
+        textarea { height: 100px; }
+    </style>
+</head>
+<body>
+    <h1>WebSocket Test Client</h1>
+    <p>This client will be used to test WebSocket communication in task 3.2</p>
+    
+    <div class="container">
+        <h3>Connection</h3>
+        <input type="text" id="serverUrl" placeholder="ws://localhost:8080" value="ws://localhost:8080">
+        <button id="connectBtn">Connect</button>
+        <button id="disconnectBtn" disabled>Disconnect</button>
+        <div id="status" class="status disconnected">Disconnected</div>
+    </div>
+
+    <div class="container">
+        <h3>Send Message</h3>
+        <textarea id="messageInput" placeholder='{"type": "ping", "payload": "Hello Server!"}'></textarea>
+        <button id="sendBtn" disabled>Send Message</button>
+    </div>
+
+    <div class="container">
+        <h3>Messages</h3>
+        <button id="clearBtn">Clear Messages</button>
+        <div id="messages"></div>
+    </div>
+
+    <script>
+        // WebSocket client implementation will be completed in task 3.2
+        console.log('WebSocket client HTML loaded - implementation pending task 3.2');
+        
+        // Placeholder functions
+        document.getElementById('connectBtn').addEventListener('click', () => {
+            alert('WebSocket connection will be implemented in task 3.2');
+        });
+        
+        document.getElementById('sendBtn').addEventListener('click', () => {
+            alert('Message sending will be implemented in task 3.2');
+        });
+        
+        document.getElementById('clearBtn').addEventListener('click', () => {
+            document.getElementById('messages').innerHTML = '';
+        });
+    </script>
+</body>
+</html>
