@@ -1,6 +1,6 @@
 # WASM-PostgreSQL Learning Project
 
-A step-by-step learning environment for WebAssembly (WASM) and PostgreSQL connections. This project is designed to help you understand the integration between WASM, WebSockets, and PostgreSQL through hands-on implementation.
+A step-by-step learning environment for WebAssembly (WASM) and PostgreSQL connections. This project is designed to help understand the integration between WASM, WebSockets, and PostgreSQL through hands-on implementation.
 
 ## Project Structure
 
@@ -69,10 +69,10 @@ This project follows a structured learning approach:
 
 ## Database Management
 
-- **Start database:** `docker-compose up -d postgres`
-- **Stop database:** `docker-compose down`
-- **Connect to database:** `docker-compose exec postgres psql -U postgres -d wasm_learning`
-- **View logs:** `docker-compose logs postgres`
+- **Start database:** `docker compose up -d postgres`
+- **Stop database:** `docker compose down`
+- **Connect to database:** `docker compose exec postgres psql -U postgres -d wasm_learning`
+- **View logs:** `docker compose logs postgres`
 
 ## Project Goals
 
@@ -86,10 +86,10 @@ By completing this project, you will learn:
 
 ## Next Steps
 
-1. Implement database client (Task 2.1)
-2. Create WebSocket server (Task 3.1)
-3. Build WASM module (Task 4.1)
-4. Integrate all components (Task 5+)
+1. Implement database client 
+2. Create WebSocket server
+3. Build WASM module 
+4. Integrate all components 
 
 ## Resources
 
