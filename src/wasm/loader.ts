@@ -37,6 +37,11 @@ export interface WasmModule {
   // Error handling demonstration
   safe_parse_int(input: string): number;
   
+  // WebSocket functionality
+  WasmWebSocketClient: any;
+  create_websocket_client(url: string): any;
+  wasm_query_database(websocket_url: string, sql: string, params_json?: string): any;
+  
   // Initialization
   main(): void;
 }
@@ -113,6 +118,9 @@ export class BrowserWasmLoader implements WasmLoader {
         create_array: wasmModule.create_array,
         sum_array: wasmModule.sum_array,
         safe_parse_int: wasmModule.safe_parse_int,
+        WasmWebSocketClient: wasmModule.WasmWebSocketClient,
+        create_websocket_client: wasmModule.create_websocket_client,
+        wasm_query_database: wasmModule.wasm_query_database,
         main: wasmModule.main
       };
 
@@ -167,6 +175,9 @@ export class NodeWasmLoader implements WasmLoader {
         create_array: wasmModule.create_array,
         sum_array: wasmModule.sum_array,
         safe_parse_int: wasmModule.safe_parse_int,
+        WasmWebSocketClient: wasmModule.WasmWebSocketClient,
+        create_websocket_client: wasmModule.create_websocket_client,
+        wasm_query_database: wasmModule.wasm_query_database,
         main: wasmModule.main
       };
 

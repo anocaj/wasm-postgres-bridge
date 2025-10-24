@@ -1,0 +1,636 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WASM Integration Browser Tests</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .test-container {
+            background: white;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 15px 0;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .test-result {
+            padding: 10px;
+            border-radius: 4px;
+            margin: 10px 0;
+            font-family: monospace;
+        }
+        .test-pass {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .test-fail {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .test-info {
+            background-color: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+        button {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 16px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover { background-color: #0056b3; }
+        button:disabled {
+            background-color: #6c757d;
+            cursor: not-allowed;
+        }
+        .progress {
+            width: 100%;
+            height: 20px;
+            background-color: #e9ecef;
+            border-radius: 10px;
+            overflow: hidden;
+            margin: 10px 0;
+        }
+        .progress-bar {
+            height: 100%;
+            background-color: #007bff;
+            transition: width 0.3s ease;
+        }
+        .summary {
+            background: #e9ecef;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 20px 0;
+        }
+        .metric {
+            display: inline-block;
+            margin: 5px 15px;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <h1>🧪 WASM Integration Browser Tests</h1>
+    <p>This page runs comprehensive integration tests for the WASM → WebSocket → Database flow in a browser environment.</p>
+
+    <div class="test-container">
+        <h3>Test Configuration</h3>
+        <div>
+            <label>WebSocket Server URL:</label>
+            <input type="text" id="websocketUrl" value="ws://localhost:8080" style="width: 300px; margin: 5px;">
+        </div>
+        <div>
+            <button id="runAllTestsBtn">🚀 Run All Tests</button>
+            <button id="runBasicTestsBtn">🔧 Run Basic Tests</button>
+            <button id="runAdvancedTestsBtn">⚡ Run Advanced Tests</button>
+            <button id="clearResultsBtn">🗑️ Clear Results</button>
+        </div>
+    </div>
+
+    <div class="test-container">
+        <h3>Test Progress</h3>
+        <div class="progress">
+            <div class="progress-bar" id="progressBar" style="width: 0%"></div>
+        </div>
+        <div id="currentTest">Ready to run tests...</div>
+    </div>
+
+    <div class="test-container">
+        <h3>Test Summary</h3>
+        <div class="summary" id="testSummary">
+            <div class="metric">Total Tests: <span id="totalTests">0</span></div>
+            <div class="metric">Passed: <span id="passedTests">0</span></div>
+            <div class="metric">Failed: <span id="failedTests">0</span></div>
+            <div class="metric">Success Rate: <span id="successRate">0%</span></div>
+            <div class="metric">Total Time: <span id="totalTime">0ms</span></div>
+        </div>
+    </div>
+
+    <div class="test-container">
+        <h3>Test Results</h3>
+        <div id="testResults">
+            <div class="test-info">No tests run yet. Click "Run All Tests" to begin.</div>
+        </div>
+    </div>
+
+    <script type="module">
+        class WasmIntegrationTester {
+            constructor() {
+                this.wasmModule = null;
+                this.wasmClient = null;
+                this.testResults = [];
+                this.currentTestIndex = 0;
+                this.totalTests = 0;
+                this.startTime = 0;
+                
+                this.initializeEventListeners();
+            }
+
+            initializeEventListeners() {
+                document.getElementById('runAllTestsBtn').addEventListener('click', () => this.runAllTests());
+                document.getElementById('runBasicTestsBtn').addEventListener('click', () => this.runBasicTests());
+                document.getElementById('runAdvancedTestsBtn').addEventListener('click', () => this.runAdvancedTests());
+                document.getElementById('clearResultsBtn').addEventListener('click', () => this.clearResults());
+            }
+
+            async runAllTests() {
+                await this.runTestSuite([
+                    'loadWasmModule',
+                    'testBasicWasmFunctions',
+                    'createWebSocketClient',
+                    'connectToWebSocket',
+                    'sendPingMessage',
+                    'executeSimpleQuery',
+                    'executeParameterizedQuery',
+                    'handleQueryErrors',
+                    'handleDangerousQueries',
+                    'testConcurrentQueries',
+                    'measurePerformance',
+                    'testConnectionRecovery',
+                    'validateCompleteFlow'
+                ]);
+            }
+
+            async runBasicTests() {
+                await this.runTestSuite([
+                    'loadWasmModule',
+                    'testBasicWasmFunctions',
+                    'createWebSocketClient',
+                    'connectToWebSocket',
+                    'sendPingMessage',
+                    'executeSimpleQuery'
+                ]);
+            }
+
+            async runAdvancedTests() {
+                await this.runTestSuite([
+                    'executeParameterizedQuery',
+                    'handleQueryErrors',
+                    'handleDangerousQueries',
+                    'testConcurrentQueries',
+                    'measurePerformance',
+                    'testConnectionRecovery',
+                    'validateCompleteFlow'
+                ]);
+            }
+
+            async runTestSuite(testNames) {
+                this.clearResults();
+                this.testResults = [];
+                this.currentTestIndex = 0;
+                this.totalTests = testNames.length;
+                this.startTime = Date.now();
+
+                this.updateProgress(0, 'Initializing tests...');
+                this.disableButtons();
+
+                try {
+                    for (let i = 0; i < testNames.length; i++) {
+                        const testName = testNames[i];
+                        this.currentTestIndex = i;
+                        
+                        this.updateProgress((i / testNames.length) * 100, `Running: ${testName}`);
+                        
+                        try {
+                            await this[testName]();
+                            this.addTestResult(testName, true, null);
+                        } catch (error) {
+                            this.addTestResult(testName, false, error.message);
+                        }
+                        
+                        // Small delay between tests
+                        await this.sleep(500);
+                    }
+                    
+                    this.updateProgress(100, 'All tests completed!');
+                    
+                } catch (error) {
+                    this.addTestResult('Test Suite', false, `Test suite failed: ${error.message}`);
+                } finally {
+                    this.enableButtons();
+                    this.updateSummary();
+                    
+                    // Cleanup
+                    if (this.wasmClient) {
+                        try {
+                            this.wasmClient.disconnect();
+                        } catch (error) {
+                            // Ignore cleanup errors
+                        }
+                    }
+                }
+            }
+
+            // Test implementations
+            async loadWasmModule() {
+                const wasmModule = await import('../src/wasm/pkg/wasm_postgres_learning.js');
+                await wasmModule.default();
+                this.wasmModule = wasmModule;
+                
+                if (!this.wasmModule) {
+                    throw new Error('Failed to load WASM module');
+                }
+            }
+
+            async testBasicWasmFunctions() {
+                if (!this.wasmModule) {
+                    throw new Error('WASM module not loaded');
+                }
+
+                // Test arithmetic
+                const addResult = this.wasmModule.add(10, 5);
+                if (addResult !== 15) {
+                    throw new Error(`Add function failed: expected 15, got ${addResult}`);
+                }
+
+                // Test string processing
+                const reverseResult = this.wasmModule.reverse_string('hello');
+                if (reverseResult !== 'olleh') {
+                    throw new Error(`Reverse function failed: expected 'olleh', got '${reverseResult}'`);
+                }
+            }
+
+            async createWebSocketClient() {
+                if (!this.wasmModule || !this.wasmModule.WasmWebSocketClient) {
+                    throw new Error('WASM WebSocket client not available');
+                }
+
+                const websocketUrl = document.getElementById('websocketUrl').value;
+                this.wasmClient = new this.wasmModule.WasmWebSocketClient(websocketUrl);
+                
+                if (!this.wasmClient) {
+                    throw new Error('Failed to create WASM WebSocket client');
+                }
+            }
+
+            async connectToWebSocket() {
+                if (!this.wasmClient) {
+                    throw new Error('WASM client not created');
+                }
+
+                this.wasmClient.connect();
+                
+                // Wait for connection
+                await this.sleep(2000);
+                
+                if (!this.wasmClient.is_connected()) {
+                    throw new Error('Failed to connect to WebSocket server');
+                }
+            }
+
+            async sendPingMessage() {
+                if (!this.wasmClient || !this.wasmClient.is_connected()) {
+                    throw new Error('WASM client not connected');
+                }
+
+                const receivedMessages = [];
+                this.wasmClient.set_message_handler((message) => {
+                    receivedMessages.push(JSON.parse(message));
+                });
+
+                const messageId = this.wasmClient.send_ping('Browser test ping');
+                
+                // Wait for response
+                await this.sleep(3000);
+                
+                const pingResponse = receivedMessages.find(msg => 
+                    msg.type === 'result' && msg.id === messageId
+                );
+                
+                if (!pingResponse || pingResponse.payload.message !== 'pong') {
+                    throw new Error('Ping response not received or invalid');
+                }
+            }
+
+            async executeSimpleQuery() {
+                if (!this.wasmClient || !this.wasmClient.is_connected()) {
+                    throw new Error('WASM client not connected');
+                }
+
+                const receivedMessages = [];
+                this.wasmClient.set_message_handler((message) => {
+                    receivedMessages.push(JSON.parse(message));
+                });
+
+                const testQuery = "SELECT 'Browser Integration Test' as message, NOW() as timestamp";
+                const messageId = this.wasmClient.send_query(testQuery);
+                
+                // Wait for response
+                await this.sleep(5000);
+                
+                const queryResponse = receivedMessages.find(msg => 
+                    msg.type === 'result' && msg.id === messageId
+                );
+                
+                if (!queryResponse) {
+                    throw new Error('Query response not received');
+                }
+                
+                if (!queryResponse.payload.rows || queryResponse.payload.rows.length === 0) {
+                    throw new Error('No rows returned from query');
+                }
+                
+                if (queryResponse.payload.rows[0].message !== 'Browser Integration Test') {
+                    throw new Error('Incorrect query result');
+                }
+            }
+
+            async executeParameterizedQuery() {
+                if (!this.wasmClient || !this.wasmClient.is_connected()) {
+                    throw new Error('WASM client not connected');
+                }
+
+                const receivedMessages = [];
+                this.wasmClient.set_message_handler((message) => {
+                    receivedMessages.push(JSON.parse(message));
+                });
+
+                const testQuery = "SELECT $1 as param_value, $2 as param_count";
+                const params = JSON.stringify(['test_parameter', 42]);
+                const messageId = this.wasmClient.send_query(testQuery, params);
+                
+                await this.sleep(5000);
+                
+                const queryResponse = receivedMessages.find(msg => 
+                    msg.type === 'result' && msg.id === messageId
+                );
+                
+                if (!queryResponse || !queryResponse.payload.rows) {
+                    throw new Error('Parameterized query failed');
+                }
+                
+                const row = queryResponse.payload.rows[0];
+                if (row.param_value !== 'test_parameter' || row.param_count !== 42) {
+                    throw new Error('Parameters not processed correctly');
+                }
+            }
+
+            async handleQueryErrors() {
+                if (!this.wasmClient || !this.wasmClient.is_connected()) {
+                    throw new Error('WASM client not connected');
+                }
+
+                const receivedMessages = [];
+                this.wasmClient.set_message_handler((message) => {
+                    receivedMessages.push(JSON.parse(message));
+                });
+
+                const invalidQuery = "SELECT * FROM nonexistent_table_browser_test";
+                const messageId = this.wasmClient.send_query(invalidQuery);
+                
+                await this.sleep(5000);
+                
+                const errorResponse = receivedMessages.find(msg => 
+                    msg.type === 'error' && msg.id === messageId
+                );
+                
+                if (!errorResponse) {
+                    throw new Error('Error response not received for invalid query');
+                }
+                
+                if (errorResponse.payload.code !== 'DATABASE_ERROR') {
+                    throw new Error('Incorrect error code for database error');
+                }
+            }
+
+            async handleDangerousQueries() {
+                if (!this.wasmClient || !this.wasmClient.is_connected()) {
+                    throw new Error('WASM client not connected');
+                }
+
+                const receivedMessages = [];
+                this.wasmClient.set_message_handler((message) => {
+                    receivedMessages.push(JSON.parse(message));
+                });
+
+                const dangerousQuery = "DROP TABLE users";
+                const messageId = this.wasmClient.send_query(dangerousQuery);
+                
+                await this.sleep(5000);
+                
+                const errorResponse = receivedMessages.find(msg => 
+                    msg.type === 'error' && msg.id === messageId
+                );
+                
+                if (!errorResponse) {
+                    throw new Error('Error response not received for dangerous query');
+                }
+                
+                if (errorResponse.payload.code !== 'DANGEROUS_SQL') {
+                    throw new Error('Dangerous query was not properly rejected');
+                }
+            }
+
+            async testConcurrentQueries() {
+                if (!this.wasmClient || !this.wasmClient.is_connected()) {
+                    throw new Error('WASM client not connected');
+                }
+
+                const receivedMessages = [];
+                this.wasmClient.set_message_handler((message) => {
+                    receivedMessages.push(JSON.parse(message));
+                });
+
+                const queries = [
+                    "SELECT 1 as query_num",
+                    "SELECT 2 as query_num",
+                    "SELECT 3 as query_num"
+                ];
+
+                const messageIds = queries.map(query => this.wasmClient.send_query(query));
+                
+                await this.sleep(8000);
+                
+                // Check that we received responses for all queries
+                for (const messageId of messageIds) {
+                    const response = receivedMessages.find(msg => 
+                        msg.id === messageId && msg.type === 'result'
+                    );
+                    if (!response) {
+                        throw new Error(`No response received for concurrent query ${messageId}`);
+                    }
+                }
+            }
+
+            async measurePerformance() {
+                if (!this.wasmClient || !this.wasmClient.is_connected()) {
+                    throw new Error('WASM client not connected');
+                }
+
+                const receivedMessages = [];
+                const queryTimes = [];
+                
+                this.wasmClient.set_message_handler((message) => {
+                    receivedMessages.push(JSON.parse(message));
+                });
+
+                const performanceQueries = [
+                    "SELECT 'Performance Test 1' as test",
+                    "SELECT 'Performance Test 2' as test",
+                    "SELECT 'Performance Test 3' as test"
+                ];
+
+                for (const query of performanceQueries) {
+                    const startTime = Date.now();
+                    const messageId = this.wasmClient.send_query(query);
+                    
+                    // Wait for this specific response
+                    let response = null;
+                    let attempts = 0;
+                    while (!response && attempts < 50) {
+                        await this.sleep(100);
+                        response = receivedMessages.find(msg => 
+                            msg.id === messageId && msg.type === 'result'
+                        );
+                        attempts++;
+                    }
+                    
+                    if (response) {
+                        const endTime = Date.now();
+                        queryTimes.push(endTime - startTime);
+                    } else {
+                        throw new Error('Performance test query timed out');
+                    }
+                }
+
+                const avgTime = queryTimes.reduce((a, b) => a + b, 0) / queryTimes.length;
+                if (avgTime > 10000) { // 10 seconds
+                    throw new Error(`Performance too slow: average ${avgTime}ms`);
+                }
+            }
+
+            async testConnectionRecovery() {
+                if (!this.wasmClient) {
+                    throw new Error('WASM client not created');
+                }
+
+                // Test disconnect and reconnect
+                this.wasmClient.disconnect();
+                await this.sleep(1000);
+                
+                this.wasmClient.connect();
+                await this.sleep(2000);
+                
+                if (!this.wasmClient.is_connected()) {
+                    throw new Error('Failed to reconnect after disconnect');
+                }
+            }
+
+            async validateCompleteFlow() {
+                if (!this.wasmClient || !this.wasmClient.is_connected()) {
+                    throw new Error('WASM client not connected');
+                }
+
+                const receivedMessages = [];
+                this.wasmClient.set_message_handler((message) => {
+                    receivedMessages.push(JSON.parse(message));
+                });
+
+                const flowQuery = `
+                    SELECT 
+                        'Complete Browser Flow Test' as test_name,
+                        NOW() as execution_time,
+                        'WASM → WebSocket → Database → Response' as flow_description
+                `;
+                const messageId = this.wasmClient.send_query(flowQuery);
+                
+                await this.sleep(5000);
+                
+                const response = receivedMessages.find(msg => 
+                    msg.id === messageId && msg.type === 'result'
+                );
+                
+                if (!response) {
+                    throw new Error('Complete flow test failed - no response');
+                }
+                
+                const row = response.payload.rows[0];
+                if (row.test_name !== 'Complete Browser Flow Test') {
+                    throw new Error('Complete flow test failed - incorrect data');
+                }
+                
+                if (row.flow_description !== 'WASM → WebSocket → Database → Response') {
+                    throw new Error('Complete flow test failed - incorrect flow description');
+                }
+            }
+
+            // Utility methods
+            sleep(ms) {
+                return new Promise(resolve => setTimeout(resolve, ms));
+            }
+
+            addTestResult(testName, success, error) {
+                this.testResults.push({ testName, success, error });
+                
+                const resultsDiv = document.getElementById('testResults');
+                const resultDiv = document.createElement('div');
+                resultDiv.className = `test-result ${success ? 'test-pass' : 'test-fail'}`;
+                
+                const icon = success ? '✅' : '❌';
+                const status = success ? 'PASS' : 'FAIL';
+                
+                let html = `${icon} <strong>${testName}</strong> - ${status}`;
+                if (error) {
+                    html += `<br>Error: ${error}`;
+                }
+                
+                resultDiv.innerHTML = html;
+                resultsDiv.appendChild(resultDiv);
+                resultsDiv.scrollTop = resultsDiv.scrollHeight;
+            }
+
+            updateProgress(percentage, message) {
+                document.getElementById('progressBar').style.width = `${percentage}%`;
+                document.getElementById('currentTest').textContent = message;
+            }
+
+            updateSummary() {
+                const totalTests = this.testResults.length;
+                const passedTests = this.testResults.filter(r => r.success).length;
+                const failedTests = totalTests - passedTests;
+                const successRate = totalTests > 0 ? ((passedTests / totalTests) * 100).toFixed(1) : 0;
+                const totalTime = Date.now() - this.startTime;
+
+                document.getElementById('totalTests').textContent = totalTests;
+                document.getElementById('passedTests').textContent = passedTests;
+                document.getElementById('failedTests').textContent = failedTests;
+                document.getElementById('successRate').textContent = `${successRate}%`;
+                document.getElementById('totalTime').textContent = `${totalTime}ms`;
+            }
+
+            clearResults() {
+                document.getElementById('testResults').innerHTML = '<div class="test-info">Results cleared. Ready for new tests.</div>';
+                document.getElementById('progressBar').style.width = '0%';
+                document.getElementById('currentTest').textContent = 'Ready to run tests...';
+                this.updateSummary();
+            }
+
+            disableButtons() {
+                document.querySelectorAll('button').forEach(btn => btn.disabled = true);
+            }
+
+            enableButtons() {
+                document.querySelectorAll('button').forEach(btn => btn.disabled = false);
+            }
+        }
+
+        // Initialize the tester when the page loads
+        const tester = new WasmIntegrationTester();
+        
+        console.log('🧪 WASM Integration Browser Tests initialized');
+        console.log('Make sure the WebSocket server is running on the configured port before running tests.');
+    </script>
+</body>
+</html>

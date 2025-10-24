@@ -1,4 +1,9 @@
 use wasm_bindgen::prelude::*;
+use wasm_bindgen_futures::JsFuture;
+use web_sys::{WebSocket, MessageEvent, ErrorEvent, CloseEvent};
+use js_sys::{Promise, JSON};
+use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 
 // Import the `console.log` function from the browser
 #[wasm_bindgen]
@@ -10,6 +15,33 @@ extern "C" {
 // Define a macro to make console.log easier to use
 macro_rules! console_log {
     ($($t:tt)*) => (log(&format_args!($($t)*).to_string()))
+}
+
+// WebSocket message structures
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct WebSocketMessage {
+    #[serde(rename = "type")]
+    pub message_type: String,
+    pub payload: serde_json::Value,
+    pub id: Option<String>,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct QueryPayload {
+    pub sql: String,
+    pub params: Option<Vec<serde_json::Value>>,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct QueryResult {
+    pub sql: String,
+    pub params: Vec<serde_json::Value>,
+    pub rows: Vec<serde_json::Value>,
+    #[serde(rename = "rowCount")]
+    pub row_count: usize,
+    #[serde(rename = "executionTime")]
+    pub execution_time: f64,
+    pub timestamp: String,
 }
 
 // Basic arithmetic functions
@@ -106,10 +138,199 @@ pub fn safe_parse_int(input: &str) -> Result<i32, String> {
     }
 }
 
+// WebSocket client functionality
+#[wasm_bindgen]
+pub struct WasmWebSocketClient {
+    websocket: Option<WebSocket>,
+    url: String,
+    message_counter: u32,
+    pending_queries: HashMap<String, js_sys::Function>,
+}
+
+#[wasm_bindgen]
+impl WasmWebSocketClient {
+    #[wasm_bindgen(constructor)]
+    pub fn new(url: &str) -> WasmWebSocketClient {
+        console_log!("Creating WASM WebSocket client for URL: {}", url);
+        WasmWebSocketClient {
+            websocket: None,
+            url: url.to_string(),
+            message_counter: 0,
+            pending_queries: HashMap::new(),
+        }
+    }
+
+    #[wasm_bindgen]
+    pub fn connect(&mut self) -> Result<(), JsValue> {
+        console_log!("Connecting to WebSocket server: {}", self.url);
+        
+        let ws = WebSocket::new(&self.url)?;
+        ws.set_binary_type(web_sys::BinaryType::Arraybuffer);
+
+        // Set up event handlers
+        let onopen_callback = Closure::wrap(Box::new(move |_| {
+            console_log!("WASM WebSocket connected successfully");
+        }) as Box<dyn FnMut(JsValue)>);
+        ws.set_onopen(Some(onopen_callback.as_ref().unchecked_ref()));
+        onopen_callback.forget();
+
+        let onerror_callback = Closure::wrap(Box::new(move |e: ErrorEvent| {
+            console_log!("WASM WebSocket error: {:?}", e);
+        }) as Box<dyn FnMut(ErrorEvent)>);
+        ws.set_onerror(Some(onerror_callback.as_ref().unchecked_ref()));
+        onerror_callback.forget();
+
+        let onclose_callback = Closure::wrap(Box::new(move |e: CloseEvent| {
+            console_log!("WASM WebSocket closed: code={}, reason={}", e.code(), e.reason());
+        }) as Box<dyn FnMut(CloseEvent)>);
+        ws.set_onclose(Some(onclose_callback.as_ref().unchecked_ref()));
+        onclose_callback.forget();
+
+        self.websocket = Some(ws);
+        Ok(())
+    }
+
+    #[wasm_bindgen]
+    pub fn disconnect(&mut self) {
+        if let Some(ws) = &self.websocket {
+            console_log!("Disconnecting WASM WebSocket");
+            let _ = ws.close();
+            self.websocket = None;
+        }
+    }
+
+    #[wasm_bindgen]
+    pub fn is_connected(&self) -> bool {
+        if let Some(ws) = &self.websocket {
+            ws.ready_state() == WebSocket::OPEN
+        } else {
+            false
+        }
+    }
+
+    #[wasm_bindgen]
+    pub fn send_ping(&mut self, message: &str) -> Result<String, JsValue> {
+        if !self.is_connected() {
+            return Err(JsValue::from_str("WebSocket not connected"));
+        }
+
+        self.message_counter += 1;
+        let message_id = format!("wasm_ping_{}_{}", self.message_counter, js_sys::Date::now() as u64);
+
+        let ping_message = WebSocketMessage {
+            message_type: "ping".to_string(),
+            payload: serde_json::Value::String(message.to_string()),
+            id: Some(message_id.clone()),
+        };
+
+        self.send_message(&ping_message)?;
+        console_log!("WASM sent ping message: {}", message);
+        Ok(message_id)
+    }
+
+    #[wasm_bindgen]
+    pub fn send_query(&mut self, sql: &str, params_json: Option<String>) -> Result<String, JsValue> {
+        if !self.is_connected() {
+            return Err(JsValue::from_str("WebSocket not connected"));
+        }
+
+        self.message_counter += 1;
+        let message_id = format!("wasm_query_{}_{}", self.message_counter, js_sys::Date::now() as u64);
+
+        // Parse parameters if provided
+        let params = if let Some(params_str) = params_json {
+            match serde_json::from_str::<Vec<serde_json::Value>>(&params_str) {
+                Ok(p) => Some(p),
+                Err(e) => {
+                    console_log!("Failed to parse query parameters: {}", e);
+                    return Err(JsValue::from_str(&format!("Invalid parameters JSON: {}", e)));
+                }
+            }
+        } else {
+            None
+        };
+
+        let query_payload = QueryPayload {
+            sql: sql.to_string(),
+            params,
+        };
+
+        let query_message = WebSocketMessage {
+            message_type: "query".to_string(),
+            payload: serde_json::to_value(query_payload).map_err(|e| {
+                JsValue::from_str(&format!("Failed to serialize query: {}", e))
+            })?,
+            id: Some(message_id.clone()),
+        };
+
+        self.send_message(&query_message)?;
+        console_log!("WASM sent query: {}", sql);
+        Ok(message_id)
+    }
+
+    fn send_message(&self, message: &WebSocketMessage) -> Result<(), JsValue> {
+        if let Some(ws) = &self.websocket {
+            let message_json = serde_json::to_string(message).map_err(|e| {
+                JsValue::from_str(&format!("Failed to serialize message: {}", e))
+            })?;
+            
+            ws.send_with_str(&message_json)?;
+            console_log!("WASM sent WebSocket message: {}", message_json);
+            Ok(())
+        } else {
+            Err(JsValue::from_str("WebSocket not initialized"))
+        }
+    }
+
+    #[wasm_bindgen]
+    pub fn set_message_handler(&mut self, handler: js_sys::Function) -> Result<(), JsValue> {
+        if let Some(ws) = &self.websocket {
+            let handler_clone = handler.clone();
+            let onmessage_callback = Closure::wrap(Box::new(move |e: MessageEvent| {
+                if let Ok(message_data) = e.data().dyn_into::<js_sys::JsString>() {
+                    let message_str = String::from(message_data);
+                    console_log!("WASM received WebSocket message: {}", message_str);
+                    
+                    // Call the JavaScript handler with the message
+                    let _ = handler_clone.call1(&JsValue::NULL, &JsValue::from_str(&message_str));
+                }
+            }) as Box<dyn FnMut(MessageEvent)>);
+            
+            ws.set_onmessage(Some(onmessage_callback.as_ref().unchecked_ref()));
+            onmessage_callback.forget();
+            Ok(())
+        } else {
+            Err(JsValue::from_str("WebSocket not initialized"))
+        }
+    }
+}
+
+// Convenience functions for database operations through WebSocket
+#[wasm_bindgen]
+pub fn wasm_query_database(
+    websocket_url: &str,
+    sql: &str,
+    params_json: Option<String>,
+) -> Result<WasmWebSocketClient, JsValue> {
+    console_log!("WASM creating database query client");
+    
+    let mut client = WasmWebSocketClient::new(websocket_url);
+    client.connect()?;
+    
+    console_log!("WASM WebSocket client created and connected");
+    Ok(client)
+}
+
+#[wasm_bindgen]
+pub fn create_websocket_client(url: &str) -> WasmWebSocketClient {
+    console_log!("Creating WASM WebSocket client instance");
+    WasmWebSocketClient::new(url)
+}
+
 // Utility function for initialization
 #[wasm_bindgen(start)]
 pub fn main() {
-    console_log!("WASM module initialized successfully!");
+    console_log!("WASM module with WebSocket support initialized successfully!");
 }
 
 #[cfg(test)]

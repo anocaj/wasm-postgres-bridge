@@ -1,0 +1,688 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WASM → WebSocket → Database Demo</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 15px 0;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .status {
+            padding: 12px;
+            border-radius: 6px;
+            margin: 10px 0;
+            font-weight: bold;
+        }
+        .connected { background-color: #d4edda; color: #155724; }
+        .disconnected { background-color: #f8d7da; color: #721c24; }
+        .loading { background-color: #fff3cd; color: #856404; }
+        .error { background-color: #f8d7da; color: #721c24; }
+        
+        .demo-section {
+            border-left: 4px solid #007bff;
+            padding-left: 15px;
+            margin: 20px 0;
+        }
+        
+        .query-result {
+            background-color: #f8f9fa;
+            border: 1px solid #28a745;
+            border-radius: 6px;
+            padding: 15px;
+            margin: 10px 0;
+            font-family: monospace;
+            font-size: 14px;
+        }
+        
+        .query-error {
+            background-color: #f8d7da;
+            border: 1px solid #dc3545;
+            border-radius: 6px;
+            padding: 15px;
+            margin: 10px 0;
+            font-family: monospace;
+            font-size: 14px;
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 10px 0;
+            background: white;
+        }
+        th, td {
+            border: 1px solid #dee2e6;
+            padding: 8px 12px;
+            text-align: left;
+        }
+        th {
+            background-color: #e9ecef;
+            font-weight: bold;
+        }
+        tr:nth-child(even) {
+            background-color: #f8f9fa;
+        }
+        
+        button {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 16px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+            font-size: 14px;
+        }
+        button:hover { background-color: #0056b3; }
+        button:disabled {
+            background-color: #6c757d;
+            cursor: not-allowed;
+        }
+        
+        input, textarea, select {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            margin: 5px 0;
+            font-family: monospace;
+        }
+        textarea { height: 80px; }
+        
+        .execution-info {
+            font-size: 12px;
+            color: #6c757d;
+            margin: 5px 0;
+        }
+        
+        .flow-diagram {
+            background: linear-gradient(90deg, #e3f2fd 0%, #f3e5f5 50%, #e8f5e8 100%);
+            padding: 20px;
+            border-radius: 8px;
+            text-align: center;
+            margin: 20px 0;
+        }
+        
+        .flow-step {
+            display: inline-block;
+            padding: 10px 15px;
+            margin: 0 10px;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        .arrow {
+            font-size: 20px;
+            color: #007bff;
+            margin: 0 10px;
+        }
+        
+        .log-entry {
+            background: #f8f9fa;
+            border-left: 3px solid #007bff;
+            padding: 8px 12px;
+            margin: 5px 0;
+            font-family: monospace;
+            font-size: 12px;
+        }
+        
+        .performance-metrics {
+            background: #e9ecef;
+            padding: 10px;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+        
+        .metric {
+            display: inline-block;
+            margin: 5px 10px;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <h1>🚀 WASM → WebSocket → Database Integration Demo</h1>
+    <p>This demonstration shows the complete flow from WebAssembly through WebSocket to PostgreSQL database.</p>
+    
+    <div class="flow-diagram">
+        <div class="flow-step">🦀 WASM Module</div>
+        <span class="arrow">→</span>
+        <div class="flow-step">🔌 WebSocket</div>
+        <span class="arrow">→</span>
+        <div class="flow-step">🐘 PostgreSQL</div>
+    </div>
+
+    <!-- System Status -->
+    <div class="container">
+        <h3>📊 System Status</h3>
+        <div id="wasmStatus" class="status loading">Loading WASM module...</div>
+        <div id="websocketStatus" class="status disconnected">WebSocket: Disconnected</div>
+        <div id="databaseStatus" class="status disconnected">Database: Not tested</div>
+        
+        <div style="margin-top: 15px;">
+            <button id="initializeBtn">🚀 Initialize System</button>
+            <button id="testConnectionBtn" disabled>🔍 Test Connection</button>
+            <button id="disconnectBtn" disabled>🔌 Disconnect</button>
+        </div>
+    </div>
+
+    <!-- Configuration -->
+    <div class="container">
+        <h3>⚙️ Configuration</h3>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+            <div>
+                <label><strong>WebSocket Server URL:</strong></label>
+                <input type="text" id="websocketUrl" value="ws://localhost:8080" />
+            </div>
+            <div>
+                <label><strong>Connection Timeout (ms):</strong></label>
+                <input type="number" id="connectionTimeout" value="5000" />
+            </div>
+        </div>
+    </div>
+
+    <!-- Query Interface -->
+    <div class="container">
+        <h3>🔍 Database Query Interface</h3>
+        
+        <div class="demo-section">
+            <h4>Quick Demo Queries</h4>
+            <button onclick="demo.loadDemoQuery('users')" disabled class="demo-query-btn">👥 List Users</button>
+            <button onclick="demo.loadDemoQuery('posts')" disabled class="demo-query-btn">📝 List Posts</button>
+            <button onclick="demo.loadDemoQuery('join')" disabled class="demo-query-btn">🔗 Users with Posts</button>
+            <button onclick="demo.loadDemoQuery('count')" disabled class="demo-query-btn">📊 Table Counts</button>
+            <button onclick="demo.loadDemoQuery('recent')" disabled class="demo-query-btn">⏰ Recent Activity</button>
+        </div>
+        
+        <div style="margin: 15px 0;">
+            <label><strong>SQL Query:</strong></label>
+            <textarea id="sqlQuery" placeholder="SELECT * FROM users LIMIT 5;"></textarea>
+        </div>
+        
+        <div style="margin: 15px 0;">
+            <label><strong>Parameters (JSON array, optional):</strong></label>
+            <input type="text" id="queryParams" placeholder='["param1", "param2"]' />
+        </div>
+        
+        <div>
+            <button id="executeQueryBtn" disabled>▶️ Execute Query via WASM</button>
+            <button onclick="demo.clearResults()">🗑️ Clear Results</button>
+        </div>
+    </div>
+
+    <!-- Results Display -->
+    <div class="container">
+        <h3>📋 Query Results</h3>
+        <div id="queryResults">
+            <p style="color: #6c757d; font-style: italic;">No queries executed yet. Try running a demo query above!</p>
+        </div>
+    </div>
+
+    <!-- Performance Metrics -->
+    <div class="container">
+        <h3>⚡ Performance Metrics</h3>
+        <div id="performanceMetrics" class="performance-metrics">
+            <div class="metric">Queries Executed: <span id="queryCount">0</span></div>
+            <div class="metric">Avg Response Time: <span id="avgResponseTime">-</span>ms</div>
+            <div class="metric">Total Data Transferred: <span id="dataTransferred">0</span>KB</div>
+            <div class="metric">Success Rate: <span id="successRate">-</span>%</div>
+        </div>
+    </div>
+
+    <!-- System Logs -->
+    <div class="container">
+        <h3>📝 System Logs</h3>
+        <div style="margin-bottom: 10px;">
+            <button onclick="demo.clearLogs()">🗑️ Clear Logs</button>
+            <button onclick="demo.exportLogs()">💾 Export Logs</button>
+        </div>
+        <div id="systemLogs" style="max-height: 300px; overflow-y: auto; border: 1px solid #ddd; padding: 10px; background: #f8f9fa;">
+            <!-- Logs will appear here -->
+        </div>
+    </div>
+
+    <!-- Technical Details -->
+    <div class="container">
+        <h3>🔧 Technical Implementation Details</h3>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+            <div>
+                <h4>WASM Module Features:</h4>
+                <ul>
+                    <li>✅ WebSocket client implementation in Rust</li>
+                    <li>✅ Message serialization/deserialization</li>
+                    <li>✅ Connection management</li>
+                    <li>✅ Error handling and recovery</li>
+                    <li>✅ Performance monitoring</li>
+                </ul>
+            </div>
+            <div>
+                <h4>Integration Features:</h4>
+                <ul>
+                    <li>✅ Real-time bidirectional communication</li>
+                    <li>✅ Structured message protocols</li>
+                    <li>✅ Database query forwarding</li>
+                    <li>✅ Result formatting and display</li>
+                    <li>✅ Comprehensive error handling</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        class WasmWebSocketDatabaseDemo {
+            constructor() {
+                this.wasmModule = null;
+                this.wasmClient = null;
+                this.isInitialized = false;
+                this.queryCount = 0;
+                this.responseTimes = [];
+                this.dataTransferred = 0;
+                this.successfulQueries = 0;
+                this.logs = [];
+                
+                this.initializeEventListeners();
+                this.log('Demo application initialized', 'info');
+            }
+
+            initializeEventListeners() {
+                document.getElementById('initializeBtn').addEventListener('click', () => this.initializeSystem());
+                document.getElementById('testConnectionBtn').addEventListener('click', () => this.testConnection());
+                document.getElementById('disconnectBtn').addEventListener('click', () => this.disconnect());
+                document.getElementById('executeQueryBtn').addEventListener('click', () => this.executeQuery());
+                
+                // Keyboard shortcuts
+                document.getElementById('sqlQuery').addEventListener('keypress', (e) => {
+                    if (e.key === 'Enter' && e.ctrlKey) {
+                        this.executeQuery();
+                    }
+                });
+            }
+
+            async initializeSystem() {
+                this.log('Starting system initialization...', 'info');
+                this.updateStatus('wasmStatus', 'Loading WASM module...', 'loading');
+                
+                try {
+                    // Load WASM module
+                    const wasmModule = await import('../src/wasm/pkg/wasm_postgres_learning.js');
+                    await wasmModule.default();
+                    this.wasmModule = wasmModule;
+                    
+                    this.updateStatus('wasmStatus', 'WASM module loaded successfully', 'connected');
+                    this.log('WASM module loaded and initialized', 'success');
+                    
+                    // Create WebSocket client
+                    const websocketUrl = document.getElementById('websocketUrl').value;
+                    this.wasmClient = new wasmModule.WasmWebSocketClient(websocketUrl);
+                    
+                    // Set up message handler
+                    this.wasmClient.set_message_handler((message) => {
+                        this.handleWebSocketMessage(message);
+                    });
+                    
+                    // Connect to WebSocket
+                    this.wasmClient.connect();
+                    
+                    // Wait a bit for connection
+                    setTimeout(() => {
+                        if (this.wasmClient.is_connected()) {
+                            this.updateStatus('websocketStatus', 'WebSocket: Connected', 'connected');
+                            this.log('WebSocket connection established', 'success');
+                            this.isInitialized = true;
+                            this.enableControls();
+                        } else {
+                            this.updateStatus('websocketStatus', 'WebSocket: Connection failed', 'error');
+                            this.log('WebSocket connection failed', 'error');
+                        }
+                    }, 1000);
+                    
+                } catch (error) {
+                    this.updateStatus('wasmStatus', 'WASM module failed to load', 'error');
+                    this.log(`System initialization failed: ${error.message}`, 'error');
+                    console.error('Initialization error:', error);
+                }
+            }
+
+            async testConnection() {
+                if (!this.isInitialized) {
+                    this.log('System not initialized', 'error');
+                    return;
+                }
+                
+                this.log('Testing database connection...', 'info');
+                
+                try {
+                    const testQuery = "SELECT 1 as test_connection, NOW() as current_time";
+                    const messageId = this.wasmClient.send_query(testQuery);
+                    this.log(`Test query sent with ID: ${messageId}`, 'info');
+                    
+                } catch (error) {
+                    this.log(`Connection test failed: ${error.message}`, 'error');
+                    this.updateStatus('databaseStatus', 'Database: Connection failed', 'error');
+                }
+            }
+
+            disconnect() {
+                if (this.wasmClient) {
+                    this.wasmClient.disconnect();
+                    this.updateStatus('websocketStatus', 'WebSocket: Disconnected', 'disconnected');
+                    this.updateStatus('databaseStatus', 'Database: Disconnected', 'disconnected');
+                    this.log('Disconnected from WebSocket server', 'info');
+                    this.disableControls();
+                    this.isInitialized = false;
+                }
+            }
+
+            async executeQuery() {
+                if (!this.isInitialized) {
+                    this.log('System not initialized. Please initialize first.', 'error');
+                    return;
+                }
+                
+                const sqlQuery = document.getElementById('sqlQuery').value.trim();
+                const queryParams = document.getElementById('queryParams').value.trim();
+                
+                if (!sqlQuery) {
+                    this.log('Please enter a SQL query', 'error');
+                    return;
+                }
+                
+                this.log(`Executing query via WASM: ${sqlQuery}`, 'info');
+                const startTime = performance.now();
+                
+                try {
+                    let paramsJson = null;
+                    if (queryParams) {
+                        try {
+                            JSON.parse(queryParams); // Validate JSON
+                            paramsJson = queryParams;
+                        } catch (e) {
+                            this.log(`Invalid parameters JSON: ${e.message}`, 'error');
+                            return;
+                        }
+                    }
+                    
+                    const messageId = this.wasmClient.send_query(sqlQuery, paramsJson);
+                    this.log(`Query sent with message ID: ${messageId}`, 'info');
+                    this.queryCount++;
+                    this.updateMetrics();
+                    
+                } catch (error) {
+                    this.log(`Query execution failed: ${error.message}`, 'error');
+                    this.displayQueryError({
+                        message: error.message,
+                        sql: sqlQuery,
+                        code: 'WASM_ERROR'
+                    });
+                }
+            }
+
+            handleWebSocketMessage(messageStr) {
+                try {
+                    const message = JSON.parse(messageStr);
+                    this.log(`Received WebSocket message: ${message.type}`, 'info');
+                    
+                    if (message.type === 'result') {
+                        if (message.id && message.id.includes('query')) {
+                            this.displayQueryResult(message.payload);
+                            this.updateStatus('databaseStatus', 'Database: Query successful', 'connected');
+                            this.successfulQueries++;
+                        } else if (message.id && message.id.includes('test_connection')) {
+                            this.updateStatus('databaseStatus', 'Database: Connected', 'connected');
+                            this.log('Database connection test successful', 'success');
+                        }
+                    } else if (message.type === 'error') {
+                        this.displayQueryError(message.payload);
+                        this.updateStatus('databaseStatus', 'Database: Query failed', 'error');
+                    }
+                    
+                    this.updateMetrics();
+                    
+                } catch (error) {
+                    this.log(`Error parsing WebSocket message: ${error.message}`, 'error');
+                }
+            }
+
+            displayQueryResult(result) {
+                const resultsDiv = document.getElementById('queryResults');
+                const resultDiv = document.createElement('div');
+                resultDiv.className = 'query-result';
+                
+                const executionTime = result.executionTime || 0;
+                this.responseTimes.push(executionTime);
+                
+                let html = `
+                    <div class="execution-info">
+                        <strong>✅ Query executed successfully</strong><br>
+                        <strong>SQL:</strong> ${result.sql}<br>
+                        <strong>Execution Time:</strong> ${executionTime}ms<br>
+                        <strong>Rows Returned:</strong> ${result.rowCount || result.rows?.length || 0}<br>
+                        <strong>Timestamp:</strong> ${result.timestamp || new Date().toISOString()}
+                    </div>
+                `;
+                
+                if (result.params && result.params.length > 0) {
+                    html += `<div class="execution-info"><strong>Parameters:</strong> ${JSON.stringify(result.params)}</div>`;
+                }
+                
+                if (result.rows && result.rows.length > 0) {
+                    html += this.formatResultTable(result.rows);
+                    this.dataTransferred += JSON.stringify(result.rows).length / 1024; // KB
+                } else {
+                    html += '<p><em>No rows returned</em></p>';
+                }
+                
+                resultDiv.innerHTML = html;
+                resultsDiv.insertBefore(resultDiv, resultsDiv.firstChild);
+                
+                this.log(`Query result displayed: ${result.rowCount || result.rows?.length || 0} rows`, 'success');
+            }
+
+            displayQueryError(error) {
+                const resultsDiv = document.getElementById('queryResults');
+                const errorDiv = document.createElement('div');
+                errorDiv.className = 'query-error';
+                
+                let html = `
+                    <div class="execution-info">
+                        <strong>❌ Query failed</strong><br>
+                        <strong>Error:</strong> ${error.message}<br>
+                        <strong>Code:</strong> ${error.code || 'UNKNOWN'}<br>
+                        <strong>SQL:</strong> ${error.sql || 'N/A'}
+                    </div>
+                `;
+                
+                if (error.params && error.params.length > 0) {
+                    html += `<div class="execution-info"><strong>Parameters:</strong> ${JSON.stringify(error.params)}</div>`;
+                }
+                
+                errorDiv.innerHTML = html;
+                resultsDiv.insertBefore(errorDiv, resultsDiv.firstChild);
+                
+                this.log(`Query error: ${error.message}`, 'error');
+            }
+
+            formatResultTable(rows) {
+                if (!rows || rows.length === 0) return '<p><em>No data</em></p>';
+                
+                const columns = Object.keys(rows[0]);
+                let html = '<table><thead><tr>';
+                
+                columns.forEach(col => {
+                    html += `<th>${col}</th>`;
+                });
+                html += '</tr></thead><tbody>';
+                
+                rows.forEach(row => {
+                    html += '<tr>';
+                    columns.forEach(col => {
+                        let value = row[col];
+                        if (value === null) {
+                            value = '<em style="color: #6c757d;">NULL</em>';
+                        } else if (typeof value === 'object') {
+                            value = JSON.stringify(value);
+                        } else if (typeof value === 'string' && value.length > 100) {
+                            value = value.substring(0, 100) + '...';
+                        }
+                        html += `<td>${value}</td>`;
+                    });
+                    html += '</tr>';
+                });
+                
+                html += '</tbody></table>';
+                return html;
+            }
+
+            loadDemoQuery(type) {
+                const sqlQuery = document.getElementById('sqlQuery');
+                const queryParams = document.getElementById('queryParams');
+                
+                const queries = {
+                    users: {
+                        sql: "SELECT id, name, email, created_at FROM users ORDER BY created_at DESC LIMIT 10",
+                        params: []
+                    },
+                    posts: {
+                        sql: "SELECT id, user_id, title, LEFT(content, 100) as content_preview, created_at FROM posts ORDER BY created_at DESC LIMIT 10",
+                        params: []
+                    },
+                    join: {
+                        sql: "SELECT u.name, u.email, p.title, p.created_at FROM users u JOIN posts p ON u.id = p.user_id ORDER BY p.created_at DESC LIMIT 10",
+                        params: []
+                    },
+                    count: {
+                        sql: "SELECT 'users' as table_name, COUNT(*) as count FROM users UNION ALL SELECT 'posts' as table_name, COUNT(*) as count FROM posts",
+                        params: []
+                    },
+                    recent: {
+                        sql: "SELECT 'user' as type, name as title, created_at FROM users WHERE created_at > NOW() - INTERVAL '1 day' UNION ALL SELECT 'post' as type, title, created_at FROM posts WHERE created_at > NOW() - INTERVAL '1 day' ORDER BY created_at DESC LIMIT 20",
+                        params: []
+                    }
+                };
+                
+                if (queries[type]) {
+                    sqlQuery.value = queries[type].sql;
+                    queryParams.value = queries[type].params.length > 0 ? JSON.stringify(queries[type].params) : '';
+                    this.log(`Loaded demo query: ${type}`, 'info');
+                }
+            }
+
+            updateStatus(elementId, message, type) {
+                const element = document.getElementById(elementId);
+                element.textContent = message;
+                element.className = `status ${type}`;
+            }
+
+            enableControls() {
+                document.getElementById('testConnectionBtn').disabled = false;
+                document.getElementById('disconnectBtn').disabled = false;
+                document.getElementById('executeQueryBtn').disabled = false;
+                document.querySelectorAll('.demo-query-btn').forEach(btn => btn.disabled = false);
+                document.getElementById('initializeBtn').disabled = true;
+            }
+
+            disableControls() {
+                document.getElementById('testConnectionBtn').disabled = true;
+                document.getElementById('disconnectBtn').disabled = true;
+                document.getElementById('executeQueryBtn').disabled = true;
+                document.querySelectorAll('.demo-query-btn').forEach(btn => btn.disabled = true);
+                document.getElementById('initializeBtn').disabled = false;
+            }
+
+            updateMetrics() {
+                document.getElementById('queryCount').textContent = this.queryCount;
+                
+                if (this.responseTimes.length > 0) {
+                    const avgTime = this.responseTimes.reduce((a, b) => a + b, 0) / this.responseTimes.length;
+                    document.getElementById('avgResponseTime').textContent = avgTime.toFixed(2);
+                }
+                
+                document.getElementById('dataTransferred').textContent = this.dataTransferred.toFixed(2);
+                
+                if (this.queryCount > 0) {
+                    const successRate = (this.successfulQueries / this.queryCount * 100).toFixed(1);
+                    document.getElementById('successRate').textContent = successRate;
+                }
+            }
+
+            log(message, type = 'info') {
+                const timestamp = new Date().toLocaleTimeString();
+                const logEntry = { timestamp, message, type };
+                this.logs.push(logEntry);
+                
+                const logsDiv = document.getElementById('systemLogs');
+                const logDiv = document.createElement('div');
+                logDiv.className = 'log-entry';
+                
+                const typeEmoji = {
+                    info: 'ℹ️',
+                    success: '✅',
+                    error: '❌',
+                    warning: '⚠️'
+                };
+                
+                logDiv.innerHTML = `<strong>[${timestamp}]</strong> ${typeEmoji[type] || 'ℹ️'} ${message}`;
+                logsDiv.appendChild(logDiv);
+                logsDiv.scrollTop = logsDiv.scrollHeight;
+                
+                // Keep only last 100 log entries
+                if (this.logs.length > 100) {
+                    this.logs = this.logs.slice(-100);
+                    const logEntries = logsDiv.querySelectorAll('.log-entry');
+                    if (logEntries.length > 100) {
+                        logEntries[0].remove();
+                    }
+                }
+            }
+
+            clearResults() {
+                document.getElementById('queryResults').innerHTML = '<p style="color: #6c757d; font-style: italic;">Results cleared. Execute a query to see results here.</p>';
+                this.log('Query results cleared', 'info');
+            }
+
+            clearLogs() {
+                document.getElementById('systemLogs').innerHTML = '';
+                this.logs = [];
+                this.log('System logs cleared', 'info');
+            }
+
+            exportLogs() {
+                const logData = this.logs.map(log => `[${log.timestamp}] ${log.type.toUpperCase()}: ${log.message}`).join('\n');
+                const blob = new Blob([logData], { type: 'text/plain' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `wasm-demo-logs-${new Date().toISOString().slice(0, 19).replace(/:/g, '-')}.txt`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+                this.log('Logs exported successfully', 'success');
+            }
+        }
+
+        // Initialize the demo when the page loads
+        window.demo = new WasmWebSocketDatabaseDemo();
+        
+        // Set default query
+        document.getElementById('sqlQuery').value = "SELECT 'Hello from WASM!' as message, NOW() as timestamp";
+        
+        console.log('🚀 WASM WebSocket Database Demo initialized');
+        console.log('Available demo queries: users, posts, join, count, recent');
+    </script>
+</body>
+</html>

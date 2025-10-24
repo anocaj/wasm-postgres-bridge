@@ -59,12 +59,79 @@ npm run build:wasm:node
 npm run clean:wasm
 ```
 
+### 🚀 **NEW: Complete Integration Examples**
+
+#### WASM → WebSocket → Database Demo (Browser)
+**File:** `wasm-websocket-database-demo.html`
+
+A comprehensive browser-based demonstration of the complete integration:
+
+```bash
+# Start the WebSocket server first
+npm run dev:websocket
+
+# Then open the demo in browser
+open examples/wasm-websocket-database-demo.html
+```
+
+**Features:**
+- ✅ End-to-end WASM → WebSocket → PostgreSQL flow
+- ✅ Interactive query builder with demo templates
+- ✅ Real-time performance monitoring
+- ✅ System status indicators
+- ✅ Comprehensive error handling and logging
+- ✅ Export functionality for logs and results
+
+#### WASM Database CLI Demo (Node.js)
+**File:** `wasm-database-cli-demo.ts`
+
+A command-line demonstration of the complete integration:
+
+```bash
+# Run automated demo
+npx ts-node examples/wasm-database-cli-demo.ts demo
+
+# Run interactive mode
+npx ts-node examples/wasm-database-cli-demo.ts interactive
+
+# Show help
+npx ts-node examples/wasm-database-cli-demo.ts help
+```
+
+**Features:**
+- ✅ Automated testing of full WASM → WebSocket → Database flow
+- ✅ Interactive mode for custom queries
+- ✅ Performance benchmarking and metrics
+- ✅ System status reporting
+- ✅ Comprehensive error handling
+
+## Integration Flow
+
+The new examples demonstrate this complete architecture:
+
+```
+🦀 WASM Module (Rust)
+    ↓ WebSocket Client
+🔌 WebSocket Server (Node.js)
+    ↓ Database Client
+🐘 PostgreSQL Database
+    ↓ Query Results
+🔌 WebSocket Server
+    ↓ Message Response
+🦀 WASM Module
+    ↓ Display Results
+🌐 Browser/CLI Interface
+```
+
+## Completed Examples
+
+- ✅ `wasm-functions/` - WASM function examples (Task 4) - **COMPLETED**
+- ✅ `complete-flow/` - End-to-end integration examples (Task 6) - **COMPLETED**
+
 ## Planned Examples
 
 - `database-playground/` - Interactive database query examples (Task 2)
 - `websocket-chat/` - WebSocket communication examples (Task 3)
-- ✅ `wasm-functions/` - WASM function examples (Task 4) - **COMPLETED**
-- `complete-flow/` - End-to-end integration examples (Task 6)
 
 ## Troubleshooting
 
