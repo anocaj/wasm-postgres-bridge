@@ -1,319 +1,743 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>WebSocket Test Client - WASM PostgreSQL Learning</title>
     <style>
-        body {
-            font-family: Arial, sans-serif;
-            max-width: 800px;
-            margin: 0 auto;
-            padding: 20px;
-        }
-        .container {
-            border: 1px solid #ccc;
-            border-radius: 5px;
-            padding: 20px;
-            margin: 10px 0;
-        }
-        .status {
-            padding: 10px;
-            border-radius: 3px;
-            margin: 10px 0;
-        }
-        .connected { background-color: #d4edda; color: #155724; }
-        .disconnected { background-color: #f8d7da; color: #721c24; }
-        .message {
-            background-color: #f8f9fa;
-            border: 1px solid #dee2e6;
-            border-radius: 3px;
-            padding: 10px;
-            margin: 5px 0;
-            font-family: monospace;
-        }
-        button {
-            background-color: #007bff;
-            color: white;
-            border: none;
-            padding: 10px 15px;
-            border-radius: 3px;
-            cursor: pointer;
-            margin: 5px;
-        }
-        button:hover { background-color: #0056b3; }
-        button:disabled { background-color: #6c757d; cursor: not-allowed; }
-        input, textarea {
-            width: 100%;
-            padding: 8px;
-            border: 1px solid #ccc;
-            border-radius: 3px;
-            margin: 5px 0;
-        }
-        textarea { height: 100px; }
+      body {
+        font-family: Arial, sans-serif;
+        max-width: 800px;
+        margin: 0 auto;
+        padding: 20px;
+      }
+      .container {
+        border: 1px solid #ccc;
+        border-radius: 5px;
+        padding: 20px;
+        margin: 10px 0;
+      }
+      .status {
+        padding: 10px;
+        border-radius: 3px;
+        margin: 10px 0;
+      }
+      .connected {
+        background-color: #d4edda;
+        color: #155724;
+      }
+      .disconnected {
+        background-color: #f8d7da;
+        color: #721c24;
+      }
+      .message {
+        background-color: #f8f9fa;
+        border: 1px solid #dee2e6;
+        border-radius: 3px;
+        padding: 10px;
+        margin: 5px 0;
+        font-family: monospace;
+      }
+      .query-result {
+        background-color: #f8f9fa;
+        border: 1px solid #28a745;
+        border-radius: 3px;
+        padding: 15px;
+        margin: 10px 0;
+      }
+      .query-error {
+        background-color: #f8d7da;
+        border: 1px solid #dc3545;
+        border-radius: 3px;
+        padding: 15px;
+        margin: 10px 0;
+      }
+      .query-history-item {
+        background-color: #e9ecef;
+        border: 1px solid #ced4da;
+        border-radius: 3px;
+        padding: 10px;
+        margin: 5px 0;
+        cursor: pointer;
+      }
+      .query-history-item:hover {
+        background-color: #dee2e6;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        margin: 10px 0;
+      }
+      th,
+      td {
+        border: 1px solid #dee2e6;
+        padding: 8px;
+        text-align: left;
+      }
+      th {
+        background-color: #e9ecef;
+        font-weight: bold;
+      }
+      .execution-info {
+        font-size: 0.9em;
+        color: #6c757d;
+        margin: 5px 0;
+      }
+      button {
+        background-color: #007bff;
+        color: white;
+        border: none;
+        padding: 10px 15px;
+        border-radius: 3px;
+        cursor: pointer;
+        margin: 5px;
+      }
+      button:hover {
+        background-color: #0056b3;
+      }
+      button:disabled {
+        background-color: #6c757d;
+        cursor: not-allowed;
+      }
+      input,
+      textarea {
+        width: 100%;
+        padding: 8px;
+        border: 1px solid #ccc;
+        border-radius: 3px;
+        margin: 5px 0;
+      }
+      textarea {
+        height: 100px;
+      }
     </style>
-</head>
-<body>
+  </head>
+  <body>
     <h1>WebSocket Test Client</h1>
     <p>This client will be used to test WebSocket communication in task 3.2</p>
-    
+
     <div class="container">
-        <h3>Connection</h3>
-        <input type="text" id="serverUrl" placeholder="ws://localhost:8080" value="ws://localhost:8080">
-        <button id="connectBtn">Connect</button>
-        <button id="disconnectBtn" disabled>Disconnect</button>
-        <div id="status" class="status disconnected">Disconnected</div>
+      <h3>Connection</h3>
+      <input
+        type="text"
+        id="serverUrl"
+        placeholder="ws://localhost:8080"
+        value="ws://localhost:8080"
+      />
+      <button id="connectBtn">Connect</button>
+      <button id="disconnectBtn" disabled>Disconnect</button>
+      <div id="status" class="status disconnected">Disconnected</div>
     </div>
 
     <div class="container">
-        <h3>Send Message</h3>
-        <div>
-            <strong>Quick Templates:</strong>
-            <button type="button" onclick="wsClient.loadTemplate('ping')">Ping</button>
-            <button type="button" onclick="wsClient.loadTemplate('query')">Query</button>
-            <button type="button" onclick="wsClient.loadTemplate('error')">Error Test</button>
-        </div>
-        <textarea id="messageInput" placeholder='{"type": "ping", "payload": "Hello Server!"}'></textarea>
-        <button id="sendBtn" disabled>Send Message</button>
-        <small>Tip: Press Ctrl+Enter to send message quickly</small>
+      <h3>Database Query Interface</h3>
+      <div>
+        <strong>Quick Query Templates:</strong>
+        <button type="button" onclick="wsClient.loadQueryTemplate('users')">
+          All Users
+        </button>
+        <button type="button" onclick="wsClient.loadQueryTemplate('posts')">
+          All Posts
+        </button>
+        <button type="button" onclick="wsClient.loadQueryTemplate('join')">
+          Users with Posts
+        </button>
+        <button type="button" onclick="wsClient.loadQueryTemplate('count')">
+          Count Tables
+        </button>
+      </div>
+      <div style="margin: 10px 0">
+        <label for="sqlQuery"><strong>SQL Query:</strong></label>
+        <textarea
+          id="sqlQuery"
+          placeholder="SELECT * FROM users LIMIT 10;"
+          style="height: 80px; font-family: monospace"
+        ></textarea>
+      </div>
+      <div style="margin: 10px 0">
+        <label for="queryParams"
+          ><strong>Parameters (JSON array, optional):</strong></label
+        >
+        <input
+          type="text"
+          id="queryParams"
+          placeholder='[1, "example"]'
+          style="font-family: monospace"
+        />
+      </div>
+      <button id="executeQueryBtn" disabled>Execute Query</button>
+      <button type="button" onclick="wsClient.clearQueryHistory()">
+        Clear History
+      </button>
     </div>
 
     <div class="container">
-        <h3>Messages</h3>
-        <button id="clearBtn">Clear Messages</button>
-        <div id="messages"></div>
+      <h3>Query Results</h3>
+      <div id="queryResults"></div>
+    </div>
+
+    <div class="container">
+      <h3>Query History</h3>
+      <div id="queryHistory"></div>
+    </div>
+
+    <div class="container">
+      <h3>Raw Messages (Advanced)</h3>
+      <div>
+        <strong>Message Templates:</strong>
+        <button type="button" onclick="wsClient.loadTemplate('ping')">
+          Ping
+        </button>
+        <button type="button" onclick="wsClient.loadTemplate('custom')">
+          Custom Query
+        </button>
+        <button type="button" onclick="wsClient.loadTemplate('error')">
+          Error Test
+        </button>
+      </div>
+      <textarea
+        id="messageInput"
+        placeholder='{"type": "ping", "payload": "Hello Server!"}'
+      ></textarea>
+      <button id="sendBtn" disabled>Send Raw Message</button>
+      <small>Tip: Press Ctrl+Enter to send message quickly</small>
+    </div>
+
+    <div class="container">
+      <h3>Messages</h3>
+      <button id="clearBtn">Clear Messages</button>
+      <div id="messages"></div>
     </div>
 
     <script>
-        class WebSocketTestClient {
-            constructor() {
-                this.ws = null;
-                this.messageCounter = 0;
-                this.initializeEventListeners();
-                this.updateUI();
-            }
-
-            initializeEventListeners() {
-                // Connection controls
-                document.getElementById('connectBtn').addEventListener('click', () => {
-                    this.connect();
-                });
-
-                document.getElementById('disconnectBtn').addEventListener('click', () => {
-                    this.disconnect();
-                });
-
-                // Message controls
-                document.getElementById('sendBtn').addEventListener('click', () => {
-                    this.sendMessage();
-                });
-
-                document.getElementById('messageInput').addEventListener('keypress', (e) => {
-                    if (e.key === 'Enter' && e.ctrlKey) {
-                        this.sendMessage();
-                    }
-                });
-
-                // Clear messages
-                document.getElementById('clearBtn').addEventListener('click', () => {
-                    document.getElementById('messages').innerHTML = '';
-                });
-
-                // Auto-format JSON in message input
-                document.getElementById('messageInput').addEventListener('blur', () => {
-                    this.formatMessageInput();
-                });
-            }
-
-            connect() {
-                const serverUrl = document.getElementById('serverUrl').value.trim();
-                
-                if (!serverUrl) {
-                    this.addMessage('Error: Please enter a server URL', 'error');
-                    return;
-                }
-
-                try {
-                    this.addMessage(`Connecting to ${serverUrl}...`, 'info');
-                    
-                    this.ws = new WebSocket(serverUrl);
-
-                    this.ws.onopen = (event) => {
-                        this.addMessage('Connected to WebSocket server', 'success');
-                        this.updateUI();
-                    };
-
-                    this.ws.onmessage = (event) => {
-                        try {
-                            const message = JSON.parse(event.data);
-                            this.addMessage(`Received: ${JSON.stringify(message, null, 2)}`, 'received');
-                        } catch (error) {
-                            this.addMessage(`Received (raw): ${event.data}`, 'received');
-                        }
-                    };
-
-                    this.ws.onclose = (event) => {
-                        const reason = event.reason || 'No reason provided';
-                        this.addMessage(`Connection closed (code: ${event.code}, reason: ${reason})`, 'info');
-                        this.updateUI();
-                    };
-
-                    this.ws.onerror = (error) => {
-                        this.addMessage(`WebSocket error: ${error.message || 'Connection failed'}`, 'error');
-                        this.updateUI();
-                    };
-
-                } catch (error) {
-                    this.addMessage(`Failed to connect: ${error.message}`, 'error');
-                }
-            }
-
-            disconnect() {
-                if (this.ws && this.ws.readyState === WebSocket.OPEN) {
-                    this.ws.close(1000, 'User requested disconnect');
-                    this.addMessage('Disconnecting...', 'info');
-                } else {
-                    this.addMessage('No active connection to disconnect', 'warning');
-                }
-            }
-
-            sendMessage() {
-                if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
-                    this.addMessage('Error: Not connected to server', 'error');
-                    return;
-                }
-
-                const messageInput = document.getElementById('messageInput');
-                const messageText = messageInput.value.trim();
-
-                if (!messageText) {
-                    this.addMessage('Error: Please enter a message to send', 'error');
-                    return;
-                }
-
-                try {
-                    // Try to parse as JSON to validate format
-                    const messageObj = JSON.parse(messageText);
-                    
-                    // Add ID if not present
-                    if (!messageObj.id) {
-                        messageObj.id = `msg_${++this.messageCounter}_${Date.now()}`;
-                    }
-
-                    const finalMessage = JSON.stringify(messageObj);
-                    this.ws.send(finalMessage);
-                    
-                    this.addMessage(`Sent: ${JSON.stringify(messageObj, null, 2)}`, 'sent');
-                    
-                    // Clear input after successful send
-                    messageInput.value = '';
-
-                } catch (error) {
-                    this.addMessage(`Error: Invalid JSON format - ${error.message}`, 'error');
-                }
-            }
-
-            formatMessageInput() {
-                const messageInput = document.getElementById('messageInput');
-                const text = messageInput.value.trim();
-                
-                if (text) {
-                    try {
-                        const parsed = JSON.parse(text);
-                        messageInput.value = JSON.stringify(parsed, null, 2);
-                    } catch (error) {
-                        // If it's not valid JSON, leave it as is
-                    }
-                }
-            }
-
-            addMessage(text, type = 'info') {
-                const messagesDiv = document.getElementById('messages');
-                const messageDiv = document.createElement('div');
-                messageDiv.className = 'message';
-                
-                const timestamp = new Date().toLocaleTimeString();
-                const typeLabel = type.toUpperCase();
-                
-                // Add styling based on message type
-                let style = '';
-                switch (type) {
-                    case 'error':
-                        style = 'border-left: 4px solid #dc3545; background-color: #f8d7da;';
-                        break;
-                    case 'success':
-                        style = 'border-left: 4px solid #28a745; background-color: #d4edda;';
-                        break;
-                    case 'sent':
-                        style = 'border-left: 4px solid #007bff; background-color: #d1ecf1;';
-                        break;
-                    case 'received':
-                        style = 'border-left: 4px solid #6f42c1; background-color: #e2d9f3;';
-                        break;
-                    case 'warning':
-                        style = 'border-left: 4px solid #ffc107; background-color: #fff3cd;';
-                        break;
-                    default:
-                        style = 'border-left: 4px solid #6c757d;';
-                }
-                
-                messageDiv.style.cssText = style;
-                messageDiv.innerHTML = `<strong>[${timestamp}] ${typeLabel}:</strong><br><pre>${text}</pre>`;
-                
-                messagesDiv.appendChild(messageDiv);
-                messagesDiv.scrollTop = messagesDiv.scrollHeight;
-            }
-
-            updateUI() {
-                const isConnected = this.ws && this.ws.readyState === WebSocket.OPEN;
-                
-                // Update connection status
-                const statusDiv = document.getElementById('status');
-                if (isConnected) {
-                    statusDiv.textContent = 'Connected';
-                    statusDiv.className = 'status connected';
-                } else {
-                    statusDiv.textContent = 'Disconnected';
-                    statusDiv.className = 'status disconnected';
-                }
-
-                // Update button states
-                document.getElementById('connectBtn').disabled = isConnected;
-                document.getElementById('disconnectBtn').disabled = !isConnected;
-                document.getElementById('sendBtn').disabled = !isConnected;
-                document.getElementById('serverUrl').disabled = isConnected;
-            }
-
-            // Predefined message templates for easy testing
-            loadTemplate(template) {
-                const messageInput = document.getElementById('messageInput');
-                const templates = {
-                    ping: { type: 'ping', payload: 'Hello Server!' },
-                    query: { type: 'query', payload: { sql: 'SELECT 1 as test' } },
-                    error: { type: 'invalid', payload: null }
-                };
-                
-                if (templates[template]) {
-                    messageInput.value = JSON.stringify(templates[template], null, 2);
-                }
-            }
+      class WebSocketTestClient {
+        constructor() {
+          this.ws = null;
+          this.messageCounter = 0;
+          this.queryHistory = [];
+          this.initializeEventListeners();
+          this.updateUI();
         }
 
-        // Initialize the WebSocket client when page loads
-        let wsClient;
-        document.addEventListener('DOMContentLoaded', () => {
-            wsClient = new WebSocketTestClient();
-            
-            // Add some helpful default message templates
-            const messageInput = document.getElementById('messageInput');
-            messageInput.value = JSON.stringify({
-                type: 'ping',
-                payload: 'Hello Server!'
-            }, null, 2);
+        initializeEventListeners() {
+          // Connection controls
+          document
+            .getElementById("connectBtn")
+            .addEventListener("click", () => {
+              this.connect();
+            });
 
-            console.log('WebSocket Test Client initialized');
-            console.log('Available templates: wsClient.loadTemplate("ping"), wsClient.loadTemplate("query"), wsClient.loadTemplate("error")');
-        });
+          document
+            .getElementById("disconnectBtn")
+            .addEventListener("click", () => {
+              this.disconnect();
+            });
+
+          // Message controls
+          document.getElementById("sendBtn").addEventListener("click", () => {
+            this.sendMessage();
+          });
+
+          document
+            .getElementById("messageInput")
+            .addEventListener("keypress", (e) => {
+              if (e.key === "Enter" && e.ctrlKey) {
+                this.sendMessage();
+              }
+            });
+
+          // Clear messages
+          document.getElementById("clearBtn").addEventListener("click", () => {
+            document.getElementById("messages").innerHTML = "";
+          });
+
+          // Database query controls
+          document
+            .getElementById("executeQueryBtn")
+            .addEventListener("click", () => {
+              this.executeQuery();
+            });
+
+          document
+            .getElementById("sqlQuery")
+            .addEventListener("keypress", (e) => {
+              if (e.key === "Enter" && e.ctrlKey) {
+                this.executeQuery();
+              }
+            });
+
+          // Auto-format JSON in message input
+          document
+            .getElementById("messageInput")
+            .addEventListener("blur", () => {
+              this.formatMessageInput();
+            });
+        }
+
+        connect() {
+          const serverUrl = document.getElementById("serverUrl").value.trim();
+
+          if (!serverUrl) {
+            this.addMessage("Error: Please enter a server URL", "error");
+            return;
+          }
+
+          try {
+            this.addMessage(`Connecting to ${serverUrl}...`, "info");
+
+            this.ws = new WebSocket(serverUrl);
+
+            this.ws.onopen = (event) => {
+              this.addMessage("Connected to WebSocket server", "success");
+              this.updateUI();
+            };
+
+            this.ws.onmessage = (event) => {
+              try {
+                const message = JSON.parse(event.data);
+                this.handleIncomingMessage(message);
+                this.addMessage(
+                  `Received: ${JSON.stringify(message, null, 2)}`,
+                  "received"
+                );
+              } catch (error) {
+                this.addMessage(`Received (raw): ${event.data}`, "received");
+              }
+            };
+
+            this.ws.onclose = (event) => {
+              const reason = event.reason || "No reason provided";
+              this.addMessage(
+                `Connection closed (code: ${event.code}, reason: ${reason})`,
+                "info"
+              );
+              this.updateUI();
+            };
+
+            this.ws.onerror = (error) => {
+              this.addMessage(
+                `WebSocket error: ${error.message || "Connection failed"}`,
+                "error"
+              );
+              this.updateUI();
+            };
+          } catch (error) {
+            this.addMessage(`Failed to connect: ${error.message}`, "error");
+          }
+        }
+
+        disconnect() {
+          if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+            this.ws.close(1000, "User requested disconnect");
+            this.addMessage("Disconnecting...", "info");
+          } else {
+            this.addMessage("No active connection to disconnect", "warning");
+          }
+        }
+
+        sendMessage() {
+          if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
+            this.addMessage("Error: Not connected to server", "error");
+            return;
+          }
+
+          const messageInput = document.getElementById("messageInput");
+          const messageText = messageInput.value.trim();
+
+          if (!messageText) {
+            this.addMessage("Error: Please enter a message to send", "error");
+            return;
+          }
+
+          try {
+            // Try to parse as JSON to validate format
+            const messageObj = JSON.parse(messageText);
+
+            // Add ID if not present
+            if (!messageObj.id) {
+              messageObj.id = `msg_${++this.messageCounter}_${Date.now()}`;
+            }
+
+            const finalMessage = JSON.stringify(messageObj);
+            this.ws.send(finalMessage);
+
+            this.addMessage(
+              `Sent: ${JSON.stringify(messageObj, null, 2)}`,
+              "sent"
+            );
+
+            // Clear input after successful send
+            messageInput.value = "";
+          } catch (error) {
+            this.addMessage(
+              `Error: Invalid JSON format - ${error.message}`,
+              "error"
+            );
+          }
+        }
+
+        formatMessageInput() {
+          const messageInput = document.getElementById("messageInput");
+          const text = messageInput.value.trim();
+
+          if (text) {
+            try {
+              const parsed = JSON.parse(text);
+              messageInput.value = JSON.stringify(parsed, null, 2);
+            } catch (error) {
+              // If it's not valid JSON, leave it as is
+            }
+          }
+        }
+
+        addMessage(text, type = "info") {
+          const messagesDiv = document.getElementById("messages");
+          const messageDiv = document.createElement("div");
+          messageDiv.className = "message";
+
+          const timestamp = new Date().toLocaleTimeString();
+          const typeLabel = type.toUpperCase();
+
+          // Add styling based on message type
+          let style = "";
+          switch (type) {
+            case "error":
+              style =
+                "border-left: 4px solid #dc3545; background-color: #f8d7da;";
+              break;
+            case "success":
+              style =
+                "border-left: 4px solid #28a745; background-color: #d4edda;";
+              break;
+            case "sent":
+              style =
+                "border-left: 4px solid #007bff; background-color: #d1ecf1;";
+              break;
+            case "received":
+              style =
+                "border-left: 4px solid #6f42c1; background-color: #e2d9f3;";
+              break;
+            case "warning":
+              style =
+                "border-left: 4px solid #ffc107; background-color: #fff3cd;";
+              break;
+            default:
+              style = "border-left: 4px solid #6c757d;";
+          }
+
+          messageDiv.style.cssText = style;
+          messageDiv.innerHTML = `<strong>[${timestamp}] ${typeLabel}:</strong><br><pre>${text}</pre>`;
+
+          messagesDiv.appendChild(messageDiv);
+          messagesDiv.scrollTop = messagesDiv.scrollHeight;
+        }
+
+        updateUI() {
+          const isConnected = this.ws && this.ws.readyState === WebSocket.OPEN;
+
+          // Update connection status
+          const statusDiv = document.getElementById("status");
+          if (isConnected) {
+            statusDiv.textContent = "Connected";
+            statusDiv.className = "status connected";
+          } else {
+            statusDiv.textContent = "Disconnected";
+            statusDiv.className = "status disconnected";
+          }
+
+          // Update button states
+          document.getElementById("connectBtn").disabled = isConnected;
+          document.getElementById("disconnectBtn").disabled = !isConnected;
+          document.getElementById("sendBtn").disabled = !isConnected;
+          document.getElementById("executeQueryBtn").disabled = !isConnected;
+          document.getElementById("serverUrl").disabled = isConnected;
+        }
+
+        executeQuery() {
+          if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
+            this.addMessage("Error: Not connected to server", "error");
+            return;
+          }
+
+          const sqlQuery = document.getElementById("sqlQuery").value.trim();
+          const queryParamsText = document
+            .getElementById("queryParams")
+            .value.trim();
+
+          if (!sqlQuery) {
+            this.addMessage("Error: Please enter a SQL query", "error");
+            return;
+          }
+
+          let params = [];
+          if (queryParamsText) {
+            try {
+              params = JSON.parse(queryParamsText);
+              if (!Array.isArray(params)) {
+                throw new Error("Parameters must be an array");
+              }
+            } catch (error) {
+              this.addMessage(
+                `Error: Invalid parameters format - ${error.message}`,
+                "error"
+              );
+              return;
+            }
+          }
+
+          const queryMessage = {
+            type: "query",
+            payload: {
+              sql: sqlQuery,
+              params: params.length > 0 ? params : undefined,
+            },
+            id: `query_${++this.messageCounter}_${Date.now()}`,
+          };
+
+          // Add to query history
+          this.addToQueryHistory(sqlQuery, params);
+
+          // Send query
+          this.ws.send(JSON.stringify(queryMessage));
+          this.addMessage(`Executing query: ${sqlQuery}`, "sent");
+        }
+
+        handleIncomingMessage(message) {
+          if (
+            message.type === "result" &&
+            message.id &&
+            message.id.startsWith("query_")
+          ) {
+            this.displayQueryResult(message.payload);
+          } else if (
+            message.type === "error" &&
+            message.id &&
+            message.id.startsWith("query_")
+          ) {
+            this.displayQueryError(message.payload);
+          }
+        }
+
+        displayQueryResult(result) {
+          const resultsDiv = document.getElementById("queryResults");
+          const resultDiv = document.createElement("div");
+          resultDiv.className = "query-result";
+
+          let html = `
+                    <div class="execution-info">
+                        <strong>Query:</strong> ${result.sql}<br>
+                        <strong>Execution Time:</strong> ${result.executionTime}ms<br>
+                        <strong>Rows:</strong> ${result.rowCount}<br>
+                        <strong>Timestamp:</strong> ${result.timestamp}
+                    </div>
+                `;
+
+          if (result.params && result.params.length > 0) {
+            html += `<div class="execution-info"><strong>Parameters:</strong> ${JSON.stringify(
+              result.params
+            )}</div>`;
+          }
+
+          if (result.rows && result.rows.length > 0) {
+            html += this.formatResultTable(result.rows);
+          } else {
+            html += "<p><em>No rows returned</em></p>";
+          }
+
+          resultDiv.innerHTML = html;
+          resultsDiv.insertBefore(resultDiv, resultsDiv.firstChild);
+        }
+
+        displayQueryError(error) {
+          const resultsDiv = document.getElementById("queryResults");
+          const errorDiv = document.createElement("div");
+          errorDiv.className = "query-error";
+
+          let html = `
+                    <div class="execution-info">
+                        <strong>Error:</strong> ${error.message}<br>
+                        <strong>Code:</strong> ${error.code}<br>
+                        <strong>Query:</strong> ${error.sql}
+                    </div>
+                `;
+
+          if (error.params && error.params.length > 0) {
+            html += `<div class="execution-info"><strong>Parameters:</strong> ${JSON.stringify(
+              error.params
+            )}</div>`;
+          }
+
+          errorDiv.innerHTML = html;
+          resultsDiv.insertBefore(errorDiv, resultsDiv.firstChild);
+        }
+
+        formatResultTable(rows) {
+          if (!rows || rows.length === 0) {
+            return "<p><em>No data</em></p>";
+          }
+
+          const columns = Object.keys(rows[0]);
+          let html = "<table><thead><tr>";
+
+          columns.forEach((col) => {
+            html += `<th>${col}</th>`;
+          });
+          html += "</tr></thead><tbody>";
+
+          rows.forEach((row) => {
+            html += "<tr>";
+            columns.forEach((col) => {
+              let value = row[col];
+              if (value === null) {
+                value = "<em>NULL</em>";
+              } else if (typeof value === "object") {
+                value = JSON.stringify(value);
+              } else if (typeof value === "string" && value.length > 100) {
+                value = value.substring(0, 100) + "...";
+              }
+              html += `<td>${value}</td>`;
+            });
+            html += "</tr>";
+          });
+
+          html += "</tbody></table>";
+          return html;
+        }
+
+        addToQueryHistory(sql, params) {
+          const historyItem = {
+            sql: sql,
+            params: params,
+            timestamp: new Date().toLocaleTimeString(),
+          };
+
+          this.queryHistory.unshift(historyItem);
+
+          // Keep only last 20 queries
+          if (this.queryHistory.length > 20) {
+            this.queryHistory = this.queryHistory.slice(0, 20);
+          }
+
+          this.updateQueryHistoryDisplay();
+        }
+
+        updateQueryHistoryDisplay() {
+          const historyDiv = document.getElementById("queryHistory");
+          historyDiv.innerHTML = "";
+
+          this.queryHistory.forEach((item, index) => {
+            const itemDiv = document.createElement("div");
+            itemDiv.className = "query-history-item";
+
+            let html = `
+                        <div><strong>[${item.timestamp}]</strong> ${item.sql}</div>
+                    `;
+
+            if (item.params && item.params.length > 0) {
+              html += `<div style="font-size: 0.9em; color: #6c757d;">Parameters: ${JSON.stringify(
+                item.params
+              )}</div>`;
+            }
+
+            itemDiv.innerHTML = html;
+
+            // Click to rerun query
+            itemDiv.addEventListener("click", () => {
+              document.getElementById("sqlQuery").value = item.sql;
+              document.getElementById("queryParams").value =
+                item.params && item.params.length > 0
+                  ? JSON.stringify(item.params)
+                  : "";
+            });
+
+            historyDiv.appendChild(itemDiv);
+          });
+        }
+
+        clearQueryHistory() {
+          this.queryHistory = [];
+          document.getElementById("queryHistory").innerHTML = "";
+          document.getElementById("queryResults").innerHTML = "";
+        }
+
+        loadQueryTemplate(template) {
+          const sqlQuery = document.getElementById("sqlQuery");
+          const queryParams = document.getElementById("queryParams");
+
+          const templates = {
+            users: {
+              sql: "SELECT id, name, email, created_at FROM users ORDER BY created_at DESC LIMIT 10",
+              params: [],
+            },
+            posts: {
+              sql: "SELECT id, user_id, title, content, created_at FROM posts ORDER BY created_at DESC LIMIT 10",
+              params: [],
+            },
+            join: {
+              sql: "SELECT u.name, u.email, p.title, p.created_at FROM users u JOIN posts p ON u.id = p.user_id ORDER BY p.created_at DESC LIMIT 10",
+              params: [],
+            },
+            count: {
+              sql: "SELECT 'users' as table_name, COUNT(*) as count FROM users UNION ALL SELECT 'posts' as table_name, COUNT(*) as count FROM posts",
+              params: [],
+            },
+          };
+
+          if (templates[template]) {
+            sqlQuery.value = templates[template].sql;
+            queryParams.value =
+              templates[template].params.length > 0
+                ? JSON.stringify(templates[template].params)
+                : "";
+          }
+        }
+
+        // Predefined message templates for easy testing
+        loadTemplate(template) {
+          const messageInput = document.getElementById("messageInput");
+          const templates = {
+            ping: { type: "ping", payload: "Hello Server!" },
+            custom: {
+              type: "query",
+              payload: { sql: "SELECT 1 as test", params: [] },
+            },
+            error: { type: "invalid", payload: null },
+          };
+
+          if (templates[template]) {
+            messageInput.value = JSON.stringify(templates[template], null, 2);
+          }
+        }
+      }
+
+      // Initialize the WebSocket client when page loads
+      let wsClient;
+      document.addEventListener("DOMContentLoaded", () => {
+        wsClient = new WebSocketTestClient();
+
+        // Set default query
+        const sqlQuery = document.getElementById("sqlQuery");
+        sqlQuery.value = "SELECT id, name, email FROM users LIMIT 5";
+
+        // Add some helpful default message templates
+        const messageInput = document.getElementById("messageInput");
+        messageInput.value = JSON.stringify(
+          {
+            type: "ping",
+            payload: "Hello Server!",
+          },
+          null,
+          2
+        );
+
+        console.log("WebSocket Database Client initialized");
+        console.log(
+          'Available query templates: wsClient.loadQueryTemplate("users"), wsClient.loadQueryTemplate("posts"), etc.'
+        );
+        console.log(
+          'Available message templates: wsClient.loadTemplate("ping"), wsClient.loadTemplate("custom"), wsClient.loadTemplate("error")'
+        );
+      });
     </script>
-</body>
+  </body>
 </html>

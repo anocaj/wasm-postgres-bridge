@@ -1,5 +1,6 @@
 import { WebSocketServer as WSServer, WebSocket } from 'ws';
 import { createServer, Server } from 'http';
+import { PostgreSQLClient, DatabaseClient } from '../database/client';
 
 /**
  * WebSocket server for real-time communication
@@ -22,10 +23,20 @@ export class BasicWebSocketServer implements WebSocketServer {
   private wss: WSServer | null = null;
   private httpServer: Server | null = null;
   private clients: Set<WebSocket> = new Set();
+  private dbClient: DatabaseClient;
+
+  constructor(dbClient?: DatabaseClient) {
+    this.dbClient = dbClient || new PostgreSQLClient();
+  }
 
   async start(port: number): Promise<void> {
-    return new Promise((resolve, reject) => {
+    return new Promise(async (resolve, reject) => {
       try {
+        // Initialize database connection
+        console.log('[WebSocket] Connecting to database...');
+        await this.dbClient.connect();
+        console.log('[WebSocket] Database connected successfully');
+
         // Create HTTP server for WebSocket upgrade
         this.httpServer = createServer();
         
@@ -41,13 +52,13 @@ export class BasicWebSocketServer implements WebSocketServer {
           this.clients.add(ws);
 
           // Handle incoming messages
-          ws.on('message', (data: Buffer) => {
+          ws.on('message', async (data: Buffer) => {
             try {
               const message = this.parseMessage(data);
               console.log(`[WebSocket] Received message from ${clientId}:`, message);
               
               // Process message based on type
-              this.handleMessage(ws, message, clientId);
+              await this.handleMessage(ws, message, clientId);
             } catch (error) {
               console.error(`[WebSocket] Error parsing message from ${clientId}:`, error);
               this.sendToClient(ws, {
@@ -116,7 +127,7 @@ export class BasicWebSocketServer implements WebSocketServer {
   }
 
   async stop(): Promise<void> {
-    return new Promise((resolve) => {
+    return new Promise(async (resolve) => {
       console.log('[WebSocket] Stopping server...');
       
       // Close all client connections
@@ -126,6 +137,14 @@ export class BasicWebSocketServer implements WebSocketServer {
         }
       });
       this.clients.clear();
+
+      // Close database connection
+      try {
+        await this.dbClient.disconnect();
+        console.log('[WebSocket] Database disconnected');
+      } catch (error) {
+        console.error('[WebSocket] Error disconnecting database:', error);
+      }
 
       // Close WebSocket server
       if (this.wss) {
@@ -216,14 +235,14 @@ export class BasicWebSocketServer implements WebSocketServer {
     // Note: SQL validation is moved to handleQueryMessage for better error handling
   }
 
-  private handleMessage(ws: WebSocket, message: WebSocketMessage, clientId: string): void {
+  private async handleMessage(ws: WebSocket, message: WebSocketMessage, clientId: string): Promise<void> {
     switch (message.type) {
       case 'ping':
         this.handlePingMessage(ws, message, clientId);
         break;
       
       case 'query':
-        this.handleQueryMessage(ws, message, clientId);
+        await this.handleQueryMessage(ws, message, clientId);
         break;
       
       default:
@@ -253,44 +272,81 @@ export class BasicWebSocketServer implements WebSocketServer {
     });
   }
 
-  private handleQueryMessage(ws: WebSocket, message: WebSocketMessage, clientId: string): void {
+  private async handleQueryMessage(ws: WebSocket, message: WebSocketMessage, clientId: string): Promise<void> {
     console.log(`[WebSocket] Handling query from ${clientId}:`, message.payload);
     
-    // Basic SQL injection prevention (for learning purposes)
-    const sql = message.payload.sql.toLowerCase();
-    const dangerousKeywords = ['drop', 'delete', 'truncate', 'alter', 'create', 'insert', 'update'];
-    const hasDangerousKeyword = dangerousKeywords.some(keyword => sql.includes(keyword));
-    
-    if (hasDangerousKeyword) {
+    try {
+      // Basic SQL injection prevention (for learning purposes)
+      const sql = message.payload.sql.toLowerCase().trim();
+      const dangerousKeywords = ['drop', 'delete', 'truncate', 'alter', 'create', 'insert', 'update'];
+      const hasDangerousKeyword = dangerousKeywords.some(keyword => sql.includes(keyword));
+      
+      if (hasDangerousKeyword) {
+        this.sendToClient(ws, {
+          type: 'error',
+          payload: { 
+            message: 'Query contains potentially dangerous SQL keywords. Only SELECT queries are allowed for safety.',
+            code: 'DANGEROUS_SQL',
+            sql: message.payload.sql
+          },
+          id: message.id
+        });
+        return;
+      }
+
+      // Validate that it's a SELECT query
+      if (!sql.startsWith('select')) {
+        this.sendToClient(ws, {
+          type: 'error',
+          payload: { 
+            message: 'Only SELECT queries are allowed for safety.',
+            code: 'INVALID_QUERY_TYPE',
+            sql: message.payload.sql
+          },
+          id: message.id
+        });
+        return;
+      }
+
+      // Execute the query against the database
+      const startTime = Date.now();
+      const rows = await this.dbClient.query(message.payload.sql, message.payload.params);
+      const executionTime = Date.now() - startTime;
+
+      // Format successful response
+      const result = {
+        sql: message.payload.sql,
+        params: message.payload.params || [],
+        rows: rows,
+        rowCount: rows.length,
+        executionTime: executionTime,
+        timestamp: new Date().toISOString()
+      };
+
+      this.sendToClient(ws, {
+        type: 'result',
+        payload: result,
+        id: message.id
+      });
+
+      console.log(`[WebSocket] Query executed successfully for ${clientId}: ${rows.length} rows in ${executionTime}ms`);
+
+    } catch (error) {
+      console.error(`[WebSocket] Database query error for ${clientId}:`, error);
+      
+      // Format error response
+      const errorMessage = error instanceof Error ? error.message : 'Unknown database error';
       this.sendToClient(ws, {
         type: 'error',
         payload: { 
-          message: 'Query contains potentially dangerous SQL keywords. Only SELECT queries are allowed for safety.',
-          code: 'DANGEROUS_SQL'
+          message: `Database query failed: ${errorMessage}`,
+          code: 'DATABASE_ERROR',
+          sql: message.payload.sql,
+          params: message.payload.params || []
         },
         id: message.id
       });
-      return;
     }
-    
-    // For now, simulate query processing since database integration comes later
-    // This will be replaced with actual database calls in task 5
-    const simulatedResult = {
-      sql: message.payload.sql,
-      rows: [
-        { id: 1, name: 'Sample Data', created_at: new Date().toISOString() },
-        { id: 2, name: 'Another Row', created_at: new Date().toISOString() }
-      ],
-      rowCount: 2,
-      executionTime: Math.random() * 100,
-      timestamp: new Date().toISOString()
-    };
-
-    this.sendToClient(ws, {
-      type: 'result',
-      payload: simulatedResult,
-      id: message.id
-    });
   }
 
   private sendToClient(client: WebSocket, message: WebSocketMessage): void {
@@ -304,11 +360,11 @@ export class BasicWebSocketServer implements WebSocketServer {
   }
 
   private generateClientId(): string {
-    return `client_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    return `client_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
   }
 
   private generateMessageId(): string {
-    return `msg_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    return `msg_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
   }
 
   // Getter for testing purposes
