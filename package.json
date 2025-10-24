@@ -5,10 +5,13 @@
   "main": "dist/index.js",
   "scripts": {
     "build": "tsc",
+    "build:wasm": "cd wasm && wasm-pack build --target web --out-dir ../src/wasm/pkg",
+    "build:wasm:node": "cd wasm && wasm-pack build --target nodejs --out-dir ../src/wasm/pkg-node",
     "dev": "ts-node src/index.ts",
     "test": "jest",
     "test:watch": "jest --watch",
     "clean": "rm -rf dist",
+    "clean:wasm": "rm -rf src/wasm/pkg src/wasm/pkg-node",
     "start": "node dist/index.js"
   },
   "keywords": [

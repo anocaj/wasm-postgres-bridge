@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Simple WASM Browser Demo</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .section {
+            margin: 20px 0;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        .section h3 {
+            margin-top: 0;
+            color: #333;
+        }
+        .input-group {
+            margin: 10px 0;
+        }
+        .input-group label {
+            display: inline-block;
+            width: 100px;
+            font-weight: bold;
+        }
+        .input-group input {
+            padding: 5px;
+            margin: 0 5px;
+            border: 1px solid #ccc;
+            border-radius: 3px;
+        }
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        .result {
+            background: #f8f9fa;
+            padding: 10px;
+            border-radius: 4px;
+            margin: 10px 0;
+            font-family: monospace;
+        }
+        .error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .log {
+            background: #e2e3e5;
+            color: #383d41;
+            max-height: 200px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🚀 Simple WASM Browser Demo</h1>
+        <p>This demo shows how to load and use WebAssembly modules in the browser using direct imports.</p>
+        
+        <div id="loading" class="section">
+            <h3>📦 Loading WASM Module...</h3>
+            <div id="loadStatus">Initializing...</div>
+        </div>
+
+        <div id="arithmetic" class="section" style="display: none;">
+            <h3>🔢 Arithmetic Functions</h3>
+            <div class="input-group">
+                <label>Numbers:</label>
+                <input type="number" id="num1" value="10" placeholder="First number">
+                <input type="number" id="num2" value="5" placeholder="Second number">
+            </div>
+            <button onclick="testArithmetic('add')">Add</button>
+            <button onclick="testArithmetic('subtract')">Subtract</button>
+            <button onclick="testArithmetic('multiply')">Multiply</button>
+            <button onclick="testArithmetic('divide')">Divide</button>
+            <div id="arithmeticResult" class="result"></div>
+        </div>
+
+        <div id="strings" class="section" style="display: none;">
+            <h3>📝 String Functions</h3>
+            <div class="input-group">
+                <label>Text:</label>
+                <input type="text" id="textInput" value="Hello WASM World!" placeholder="Enter text">
+            </div>
+            <button onclick="testString('reverse')">Reverse</button>
+            <button onclick="testString('uppercase')">Uppercase</button>
+            <button onclick="testString('countWords')">Count Words</button>
+            <button onclick="testString('process')">Process</button>
+            <div id="stringResult" class="result"></div>
+        </div>
+
+        <div id="arrays" class="section" style="display: none;">
+            <h3>📊 Array Functions</h3>
+            <div class="input-group">
+                <label>Array Size:</label>
+                <input type="number" id="arraySize" value="10" min="1" max="100" placeholder="Array size">
+            </div>
+            <button onclick="testArray('create')">Create Array</button>
+            <button onclick="testArray('sum')">Sum Array</button>
+            <div id="arrayResult" class="result"></div>
+        </div>
+
+        <div id="console" class="section" style="display: none;">
+            <h3>📋 Console Log</h3>
+            <button onclick="clearConsole()">Clear Log</button>
+            <div id="consoleLog" class="result log"></div>
+        </div>
+    </div>
+
+    <!-- Import the WASM module directly -->
+    <script type="module">
+        import init, { 
+            add, subtract, multiply, divide,
+            reverse_string, to_uppercase, count_words, process_string,
+            create_array, sum_array, safe_parse_int, main
+        } from '../src/wasm/pkg/wasm_postgres_learning.js';
+
+        let wasmModule = null;
+        let currentArray = null;
+
+        // Console logging
+        function log(message, type = 'info') {
+            const consoleLog = document.getElementById('consoleLog');
+            const timestamp = new Date().toLocaleTimeString();
+            consoleLog.textContent += `[${timestamp}] ${message}\n`;
+            consoleLog.scrollTop = consoleLog.scrollHeight;
+            
+            if (type === 'error') {
+                console.error(message);
+            } else {
+                console.log(message);
+            }
+        }
+
+        window.clearConsole = function() {
+            document.getElementById('consoleLog').textContent = '';
+        };
+
+        // Initialize WASM module
+        async function initWasm() {
+            try {
+                log('Loading WASM module...');
+                
+                // Initialize the WASM module
+                await init();
+                
+                // Call the main initialization function
+                main();
+                
+                // Store the functions for easy access
+                wasmModule = {
+                    add, subtract, multiply, divide,
+                    reverse_string, to_uppercase, count_words, process_string,
+                    create_array, sum_array, safe_parse_int
+                };
+
+                document.getElementById('loadStatus').textContent = '✅ WASM module loaded successfully!';
+                document.getElementById('loadStatus').className = 'result success';
+                document.getElementById('loading').style.display = 'none';
+                
+                // Show all sections
+                document.getElementById('arithmetic').style.display = 'block';
+                document.getElementById('strings').style.display = 'block';
+                document.getElementById('arrays').style.display = 'block';
+                document.getElementById('console').style.display = 'block';
+                
+                log('WASM module initialized successfully!');
+                
+            } catch (error) {
+                const errorMsg = `Failed to load WASM module: ${error.message}`;
+                document.getElementById('loadStatus').textContent = '❌ ' + errorMsg;
+                document.getElementById('loadStatus').className = 'result error';
+                log(errorMsg, 'error');
+                console.error('Full error:', error);
+            }
+        }
+
+        // Test arithmetic functions
+        window.testArithmetic = function(operation) {
+            try {
+                const num1 = parseFloat(document.getElementById('num1').value);
+                const num2 = parseFloat(document.getElementById('num2').value);
+                
+                if (isNaN(num1) || isNaN(num2)) {
+                    throw new Error('Please enter valid numbers');
+                }
+                
+                let result;
+                switch (operation) {
+                    case 'add':
+                        result = wasmModule.add(num1, num2);
+                        break;
+                    case 'subtract':
+                        result = wasmModule.subtract(num1, num2);
+                        break;
+                    case 'multiply':
+                        result = wasmModule.multiply(num1, num2);
+                        break;
+                    case 'divide':
+                        if (num2 === 0) {
+                            throw new Error('Division by zero is not allowed');
+                        }
+                        result = wasmModule.divide(num1, num2);
+                        break;
+                    default:
+                        throw new Error('Unknown operation');
+                }
+                
+                const message = `${num1} ${operation} ${num2} = ${result}`;
+                document.getElementById('arithmeticResult').textContent = message;
+                document.getElementById('arithmeticResult').className = 'result success';
+                log(`Arithmetic: ${message}`);
+                
+            } catch (error) {
+                const errorMsg = `Error: ${error.message}`;
+                document.getElementById('arithmeticResult').textContent = errorMsg;
+                document.getElementById('arithmeticResult').className = 'result error';
+                log(`Arithmetic error: ${errorMsg}`, 'error');
+            }
+        };
+
+        // Test string functions
+        window.testString = function(operation) {
+            try {
+                const text = document.getElementById('textInput').value;
+                
+                if (!text) {
+                    throw new Error('Please enter some text');
+                }
+                
+                let result;
+                switch (operation) {
+                    case 'reverse':
+                        result = wasmModule.reverse_string(text);
+                        break;
+                    case 'uppercase':
+                        result = wasmModule.to_uppercase(text);
+                        break;
+                    case 'countWords':
+                        result = wasmModule.count_words(text);
+                        break;
+                    case 'process':
+                        result = wasmModule.process_string(text);
+                        break;
+                    default:
+                        throw new Error('Unknown operation');
+                }
+                
+                const message = `${operation}("${text}") = ${typeof result === 'string' ? '"' + result + '"' : result}`;
+                document.getElementById('stringResult').textContent = message;
+                document.getElementById('stringResult').className = 'result success';
+                log(`String: ${message}`);
+                
+            } catch (error) {
+                const errorMsg = `Error: ${error.message}`;
+                document.getElementById('stringResult').textContent = errorMsg;
+                document.getElementById('stringResult').className = 'result error';
+                log(`String error: ${errorMsg}`, 'error');
+            }
+        };
+
+        // Test array functions
+        window.testArray = function(operation) {
+            try {
+                const size = parseInt(document.getElementById('arraySize').value);
+                
+                if (isNaN(size) || size < 1 || size > 100) {
+                    throw new Error('Please enter a valid array size (1-100)');
+                }
+                
+                let result;
+                switch (operation) {
+                    case 'create':
+                        currentArray = wasmModule.create_array(size);
+                        result = `Created array of size ${size}: [${Array.from(currentArray).slice(0, 10).join(', ')}${size > 10 ? '...' : ''}]`;
+                        break;
+                    case 'sum':
+                        if (!currentArray) {
+                            throw new Error('Please create an array first');
+                        }
+                        const sum = wasmModule.sum_array(currentArray);
+                        result = `Sum of array (${currentArray.length} elements) = ${sum}`;
+                        break;
+                    default:
+                        throw new Error('Unknown operation');
+                }
+                
+                document.getElementById('arrayResult').textContent = result;
+                document.getElementById('arrayResult').className = 'result success';
+                log(`Array: ${result}`);
+                
+            } catch (error) {
+                const errorMsg = `Error: ${error.message}`;
+                document.getElementById('arrayResult').textContent = errorMsg;
+                document.getElementById('arrayResult').className = 'result error';
+                log(`Array error: ${errorMsg}`, 'error');
+            }
+        };
+
+        // Initialize when page loads
+        window.addEventListener('load', initWasm);
+    </script>
+</body>
+</html>
