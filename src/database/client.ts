@@ -1,9 +1,10 @@
 /**
  * Database client for PostgreSQL operations
- * Implements connection management with pooling and error handling
+ * Implements connection management with pooling, caching, and performance monitoring
  */
 
 import { Pool, PoolClient, PoolConfig } from 'pg';
+import { PerformanceMonitor, DetailedMetrics } from './performance-monitor';
 
 export interface DatabaseClient {
   connect(): Promise<void>;
@@ -26,15 +27,59 @@ export interface DatabaseConfig {
   max?: number; // Maximum number of clients in the pool
   idleTimeoutMillis?: number; // How long a client is allowed to remain idle
   connectionTimeoutMillis?: number; // How long to wait when connecting a new client
+  enableCache?: boolean; // Enable query result caching
+  cacheMaxSize?: number; // Maximum number of cached queries
+  cacheTtlMs?: number; // Cache time-to-live in milliseconds
+  enablePerformanceLogging?: boolean; // Enable performance monitoring
+}
+
+export interface QueryCacheEntry {
+  result: any[];
+  timestamp: number;
+  ttl: number;
+}
+
+export interface PerformanceMetrics {
+  queryCount: number;
+  totalQueryTime: number;
+  averageQueryTime: number;
+  slowQueries: Array<{
+    sql: string;
+    duration: number;
+    timestamp: number;
+  }>;
+  cacheHits: number;
+  cacheMisses: number;
+  cacheHitRate: number;
 }
 
 export class PostgreSQLClient implements DatabaseClient {
   private pool: Pool | null = null;
   private config: DatabaseConfig;
+  private queryCache: Map<string, QueryCacheEntry> = new Map();
+  private performanceMetrics: PerformanceMetrics = {
+    queryCount: 0,
+    totalQueryTime: 0,
+    averageQueryTime: 0,
+    slowQueries: [],
+    cacheHits: 0,
+    cacheMisses: 0,
+    cacheHitRate: 0,
+  };
+  private performanceMonitor: PerformanceMonitor;
 
   constructor(config?: DatabaseConfig) {
     // Parse connection string or use provided config
     this.config = config || this.parseConnectionString();
+    
+    // Set default cache and performance settings
+    this.config.enableCache = this.config.enableCache ?? true;
+    this.config.cacheMaxSize = this.config.cacheMaxSize ?? 100;
+    this.config.cacheTtlMs = this.config.cacheTtlMs ?? 300000; // 5 minutes
+    this.config.enablePerformanceLogging = this.config.enablePerformanceLogging ?? true;
+    
+    // Initialize performance monitor
+    this.performanceMonitor = new PerformanceMonitor();
   }
 
   /**
@@ -55,6 +100,10 @@ export class PostgreSQLClient implements DatabaseClient {
           max: 20,
           idleTimeoutMillis: 30000,
           connectionTimeoutMillis: 2000,
+          enableCache: true,
+          cacheMaxSize: 100,
+          cacheTtlMs: 300000,
+          enablePerformanceLogging: true,
         };
       } catch (error) {
         throw new Error(`Invalid DATABASE_URL format: ${error instanceof Error ? error.message : 'Unknown error'}`);
@@ -81,6 +130,10 @@ export class PostgreSQLClient implements DatabaseClient {
       max: 20,
       idleTimeoutMillis: 30000,
       connectionTimeoutMillis: 2000,
+      enableCache: true,
+      cacheMaxSize: 100,
+      cacheTtlMs: 300000,
+      enablePerformanceLogging: true,
     };
   }
 
@@ -120,19 +173,50 @@ export class PostgreSQLClient implements DatabaseClient {
   }
 
   /**
-   * Execute SQL query with optional parameters
+   * Execute SQL query with optional parameters, caching, and performance monitoring
    */
   async query<T>(sql: string, params?: any[]): Promise<T[]> {
     if (!this.pool) {
       throw new Error('Database not connected. Call connect() first.');
     }
 
+    const startTime = Date.now();
+    const cacheKey = this.generateCacheKey(sql, params);
+
+    // Check cache for SELECT queries
+    if (this.config.enableCache && this.isSelectQuery(sql)) {
+      const cachedResult = this.getCachedResult<T>(cacheKey);
+      if (cachedResult) {
+        this.performanceMetrics.cacheHits++;
+        this.updateCacheHitRate();
+        if (this.config.enablePerformanceLogging) {
+          console.log(`Cache hit for query: ${sql.substring(0, 50)}...`);
+        }
+        return cachedResult;
+      }
+      this.performanceMetrics.cacheMisses++;
+    }
+
     let client: PoolClient | null = null;
     
     try {
       client = await this.pool.connect();
+      console.log('[DEBUG] Executing SQL:', JSON.stringify(sql));
+      console.log('[DEBUG] With params:', JSON.stringify(params));
       const result = await client.query(sql, params);
-      return result.rows as T[];
+      const queryResult = result.rows as T[];
+
+      // Cache SELECT query results
+      if (this.config.enableCache && this.isSelectQuery(sql)) {
+        this.setCachedResult(cacheKey, queryResult);
+      }
+
+      // Update performance metrics
+      const duration = Date.now() - startTime;
+      this.updatePerformanceMetrics(sql, duration);
+      this.performanceMonitor.recordQuery(duration);
+
+      return queryResult;
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown query error';
       throw new Error(`Query execution failed: ${errorMessage}`);
@@ -174,6 +258,176 @@ export class PostgreSQLClient implements DatabaseClient {
       idleCount: this.pool.idleCount,
       waitingCount: this.pool.waitingCount,
     };
+  }
+
+  /**
+   * Generate cache key for query and parameters
+   */
+  private generateCacheKey(sql: string, params?: any[]): string {
+    const normalizedSql = sql.trim().toLowerCase();
+    const paramString = params ? JSON.stringify(params) : '';
+    return `${normalizedSql}:${paramString}`;
+  }
+
+  /**
+   * Check if query is a SELECT statement (cacheable)
+   */
+  private isSelectQuery(sql: string): boolean {
+    return sql.trim().toLowerCase().startsWith('select');
+  }
+
+  /**
+   * Get cached query result if available and not expired
+   */
+  private getCachedResult<T>(cacheKey: string): T[] | null {
+    const entry = this.queryCache.get(cacheKey);
+    if (!entry) {
+      return null;
+    }
+
+    const now = Date.now();
+    if (now - entry.timestamp > entry.ttl) {
+      this.queryCache.delete(cacheKey);
+      return null;
+    }
+
+    return entry.result as T[];
+  }
+
+  /**
+   * Cache query result with TTL
+   */
+  private setCachedResult<T>(cacheKey: string, result: T[]): void {
+    // Implement LRU eviction if cache is full
+    if (this.queryCache.size >= (this.config.cacheMaxSize || 100)) {
+      const oldestKey = this.queryCache.keys().next().value;
+      if (oldestKey) {
+        this.queryCache.delete(oldestKey);
+      }
+    }
+
+    this.queryCache.set(cacheKey, {
+      result,
+      timestamp: Date.now(),
+      ttl: this.config.cacheTtlMs || 300000,
+    });
+  }
+
+  /**
+   * Update performance metrics after query execution
+   */
+  private updatePerformanceMetrics(sql: string, duration: number): void {
+    this.performanceMetrics.queryCount++;
+    this.performanceMetrics.totalQueryTime += duration;
+    this.performanceMetrics.averageQueryTime = 
+      this.performanceMetrics.totalQueryTime / this.performanceMetrics.queryCount;
+
+    // Track slow queries (> 1000ms)
+    if (duration > 1000) {
+      this.performanceMetrics.slowQueries.push({
+        sql: sql.substring(0, 100), // Truncate for logging
+        duration,
+        timestamp: Date.now(),
+      });
+
+      // Keep only last 10 slow queries
+      if (this.performanceMetrics.slowQueries.length > 10) {
+        this.performanceMetrics.slowQueries.shift();
+      }
+    }
+
+    this.updateCacheHitRate();
+
+    if (this.config.enablePerformanceLogging && duration > 100) {
+      console.log(`Query executed in ${duration}ms: ${sql.substring(0, 50)}...`);
+    }
+  }
+
+  /**
+   * Update cache hit rate calculation
+   */
+  private updateCacheHitRate(): void {
+    const totalCacheAttempts = this.performanceMetrics.cacheHits + this.performanceMetrics.cacheMisses;
+    this.performanceMetrics.cacheHitRate = totalCacheAttempts > 0 
+      ? (this.performanceMetrics.cacheHits / totalCacheAttempts) * 100 
+      : 0;
+  }
+
+  /**
+   * Get performance metrics
+   */
+  getPerformanceMetrics(): PerformanceMetrics {
+    return { ...this.performanceMetrics };
+  }
+
+  /**
+   * Clear query cache
+   */
+  clearCache(): void {
+    this.queryCache.clear();
+    console.log('Query cache cleared');
+  }
+
+  /**
+   * Reset performance metrics
+   */
+  resetPerformanceMetrics(): void {
+    this.performanceMetrics = {
+      queryCount: 0,
+      totalQueryTime: 0,
+      averageQueryTime: 0,
+      slowQueries: [],
+      cacheHits: 0,
+      cacheMisses: 0,
+      cacheHitRate: 0,
+    };
+    console.log('Performance metrics reset');
+  }
+
+  /**
+   * Get cache statistics
+   */
+  getCacheStats() {
+    return {
+      size: this.queryCache.size,
+      maxSize: this.config.cacheMaxSize || 100,
+      hitRate: this.performanceMetrics.cacheHitRate,
+      hits: this.performanceMetrics.cacheHits,
+      misses: this.performanceMetrics.cacheMisses,
+    };
+  }
+
+  /**
+   * Get detailed performance metrics including system monitoring
+   */
+  getDetailedMetrics(): DetailedMetrics {
+    const poolStats = this.getPoolStats();
+    const cacheStats = this.getCacheStats();
+    return this.performanceMonitor.getDetailedMetrics(poolStats, cacheStats);
+  }
+
+  /**
+   * Generate comprehensive performance report
+   */
+  generatePerformanceReport(): string {
+    const poolStats = this.getPoolStats();
+    const cacheStats = this.getCacheStats();
+    return this.performanceMonitor.generateReport(poolStats, cacheStats);
+  }
+
+  /**
+   * Run performance health checks
+   */
+  runHealthChecks(): void {
+    const poolStats = this.getPoolStats();
+    const cacheStats = this.getCacheStats();
+    
+    if (poolStats) {
+      this.performanceMonitor.checkConnectionPool(poolStats);
+    }
+    
+    this.performanceMonitor.checkCachePerformance(cacheStats);
+    this.performanceMonitor.checkMemoryUsage();
   }
 
   // CRUD Operations for Users table

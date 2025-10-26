@@ -8,6 +8,8 @@
     "build:wasm": "cd wasm && wasm-pack build --target web --out-dir ../src/wasm/pkg",
     "build:wasm:node": "cd wasm && wasm-pack build --target nodejs --out-dir ../src/wasm/pkg-node",
     "dev": "ts-node src/index.ts",
+    "dev:websocket": "ts-node examples/start-websocket-server.ts",
+    "dev:secure-websocket": "ts-node examples/start-secure-server.ts",
     "test": "jest",
     "test:watch": "jest --watch",
     "clean": "rm -rf dist",

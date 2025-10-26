@@ -1,0 +1,524 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Database Playground - WASM PostgreSQL Learning</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            overflow: hidden;
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #2c3e50 0%, #34495e 100%);
+            color: white;
+            padding: 20px;
+            text-align: center;
+        }
+        
+        .content {
+            padding: 20px;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+        
+        .panel {
+            background: #f8f9fa;
+            border-radius: 8px;
+            padding: 20px;
+            border: 1px solid #e9ecef;
+        }
+        
+        .panel h3 {
+            margin-top: 0;
+            color: #2c3e50;
+            border-bottom: 2px solid #3498db;
+            padding-bottom: 10px;
+        }
+        
+        .query-builder {
+            grid-column: 1 / -1;
+        }
+        
+        .query-templates {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        
+        .template-btn {
+            background: #3498db;
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+        
+        .template-btn:hover {
+            background: #2980b9;
+        }
+        
+        textarea {
+            width: 100%;
+            height: 120px;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            padding: 10px;
+            resize: vertical;
+        }
+        
+        .execute-btn {
+            background: #27ae60;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            margin-top: 10px;
+            transition: background 0.3s;
+        }
+        
+        .execute-btn:hover {
+            background: #229954;
+        }
+        
+        .execute-btn:disabled {
+            background: #95a5a6;
+            cursor: not-allowed;
+        }
+        
+        .results {
+            background: #2c3e50;
+            color: #ecf0f1;
+            padding: 15px;
+            border-radius: 5px;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            max-height: 400px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+        }
+        
+        .status {
+            padding: 10px;
+            border-radius: 5px;
+            margin-bottom: 15px;
+            font-weight: bold;
+        }
+        
+        .status.connected {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        
+        .status.disconnected {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        
+        .metrics {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+            margin-top: 15px;
+        }
+        
+        .metric {
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            text-align: center;
+            border: 1px solid #e9ecef;
+        }
+        
+        .metric-value {
+            font-size: 24px;
+            font-weight: bold;
+            color: #3498db;
+        }
+        
+        .metric-label {
+            font-size: 12px;
+            color: #7f8c8d;
+            text-transform: uppercase;
+        }
+        
+        .log {
+            background: #34495e;
+            color: #ecf0f1;
+            padding: 10px;
+            border-radius: 5px;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+        
+        .clear-btn {
+            background: #e74c3c;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+            margin-top: 10px;
+        }
+        
+        .clear-btn:hover {
+            background: #c0392b;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🗄️ Database Playground</h1>
+            <p>Interactive PostgreSQL Query Interface with Performance Monitoring</p>
+        </div>
+        
+        <div class="content">
+            <div class="panel query-builder">
+                <h3>📝 Query Builder</h3>
+                
+                <div class="status" id="connectionStatus">
+                    🔌 Connecting to WebSocket server...
+                </div>
+                
+                <div class="panel" id="authPanel" style="display: none; margin-bottom: 15px; background: #fff3cd; border: 1px solid #ffeaa7;">
+                    <h4>🔐 Authentication Required</h4>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px;">
+                        <input type="text" id="username" placeholder="Username" style="padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
+                        <input type="password" id="password" placeholder="Password" style="padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
+                    </div>
+                    <div style="margin-bottom: 10px;">
+                        <input type="text" id="apiKey" placeholder="Or enter API Key" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
+                    </div>
+                    <button onclick="authenticate()" style="background: #3498db; color: white; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer;">
+                        🔑 Authenticate
+                    </button>
+                    <div style="margin-top: 10px; font-size: 12px; color: #666;">
+                        <strong>Demo accounts:</strong> admin/admin123 (full access), user/user123 (no delete), readonly/readonly123 (read only)<br>
+                        <strong>API Key:</strong> demo-api-key-123
+                    </div>
+                </div>
+                
+                <div class="query-templates">
+                    <button class="template-btn" onclick="loadTemplate('users')">Get All Users</button>
+                    <button class="template-btn" onclick="loadTemplate('posts')">Get All Posts</button>
+                    <button class="template-btn" onclick="loadTemplate('join')">Users with Posts</button>
+                    <button class="template-btn" onclick="loadTemplate('create')">Create User</button>
+                    <button class="template-btn" onclick="loadTemplate('update')">Update User</button>
+                    <button class="template-btn" onclick="loadTemplate('delete')">Delete User</button>
+                </div>
+                
+                <textarea id="queryInput" placeholder="Enter your SQL query here...">SELECT * FROM users LIMIT 10;</textarea>
+                
+                <button class="execute-btn" id="executeBtn" onclick="executeQuery()" disabled>
+                    ⚡ Execute Query
+                </button>
+                
+                <div class="results" id="queryResults">
+                    Ready to execute queries...
+                </div>
+            </div>
+            
+            <div class="panel">
+                <h3>📊 Performance Metrics</h3>
+                <div class="metrics" id="metricsContainer">
+                    <div class="metric">
+                        <div class="metric-value" id="queryCount">0</div>
+                        <div class="metric-label">Queries</div>
+                    </div>
+                    <div class="metric">
+                        <div class="metric-value" id="avgTime">0ms</div>
+                        <div class="metric-label">Avg Time</div>
+                    </div>
+                    <div class="metric">
+                        <div class="metric-value" id="cacheHitRate">0%</div>
+                        <div class="metric-label">Cache Hit Rate</div>
+                    </div>
+                    <div class="metric">
+                        <div class="metric-value" id="connectionPool">0/0</div>
+                        <div class="metric-label">Pool Usage</div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="panel">
+                <h3>📋 Activity Log</h3>
+                <div class="log" id="activityLog"></div>
+                <button class="clear-btn" onclick="clearLog()">Clear Log</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let ws = null;
+        let queryCount = 0;
+        let totalTime = 0;
+        let cacheHits = 0;
+        let cacheMisses = 0;
+        let isAuthenticated = false;
+        let currentUser = null;
+        
+        const queryTemplates = {
+            users: "SELECT id, name, email, created_at FROM users ORDER BY created_at DESC LIMIT 10;",
+            posts: "SELECT id, title, content, created_at FROM posts ORDER BY created_at DESC LIMIT 10;",
+            join: `SELECT u.name, u.email, p.title, p.created_at 
+FROM users u 
+JOIN posts p ON u.id = p.user_id 
+ORDER BY p.created_at DESC 
+LIMIT 10;`,
+            create: "INSERT INTO users (name, email) VALUES ('John Doe', 'john@example.com') RETURNING *;",
+            update: "UPDATE users SET name = 'Jane Doe' WHERE email = 'john@example.com' RETURNING *;",
+            delete: "DELETE FROM users WHERE email = 'john@example.com';"
+        };
+        
+        function connectWebSocket() {
+            ws = new WebSocket('ws://localhost:8080');
+            
+            ws.onopen = () => {
+                updateConnectionStatus(true);
+                log('Connected to WebSocket server');
+                
+                // Check if authentication is required
+                setTimeout(() => {
+                    if (!isAuthenticated) {
+                        document.getElementById('authPanel').style.display = 'block';
+                        log('Authentication required - please login');
+                    }
+                }, 1000);
+            };
+            
+            ws.onclose = () => {
+                updateConnectionStatus(false);
+                log('Disconnected from WebSocket server');
+                document.getElementById('executeBtn').disabled = true;
+                
+                // Attempt to reconnect after 3 seconds
+                setTimeout(connectWebSocket, 3000);
+            };
+            
+            ws.onerror = (error) => {
+                log('WebSocket error: ' + error);
+                updateConnectionStatus(false);
+            };
+            
+            ws.onmessage = (event) => {
+                try {
+                    const message = JSON.parse(event.data);
+                    handleMessage(message);
+                } catch (error) {
+                    log('Error parsing message: ' + error);
+                }
+            };
+        }
+        
+        function updateConnectionStatus(connected) {
+            const statusEl = document.getElementById('connectionStatus');
+            if (connected) {
+                statusEl.className = 'status connected';
+                statusEl.textContent = '✅ Connected to database server';
+            } else {
+                statusEl.className = 'status disconnected';
+                statusEl.textContent = '❌ Disconnected from database server';
+            }
+        }
+        
+        function loadTemplate(templateName) {
+            const query = queryTemplates[templateName];
+            if (query) {
+                document.getElementById('queryInput').value = query;
+                log(`Loaded template: ${templateName}`);
+            }
+        }
+        
+        function authenticate() {
+            const username = document.getElementById('username').value.trim();
+            const password = document.getElementById('password').value.trim();
+            const apiKey = document.getElementById('apiKey').value.trim();
+            
+            if (!ws || ws.readyState !== WebSocket.OPEN) {
+                alert('Not connected to server');
+                return;
+            }
+            
+            let authMessage;
+            if (apiKey) {
+                authMessage = {
+                    type: 'auth',
+                    payload: { apiKey: apiKey },
+                    id: Date.now().toString()
+                };
+                log('Authenticating with API key...');
+            } else if (username && password) {
+                authMessage = {
+                    type: 'auth',
+                    payload: { username: username, password: password },
+                    id: Date.now().toString()
+                };
+                log(`Authenticating as ${username}...`);
+            } else {
+                alert('Please enter username/password or API key');
+                return;
+            }
+            
+            ws.send(JSON.stringify(authMessage));
+        }
+        
+        function executeQuery() {
+            const query = document.getElementById('queryInput').value.trim();
+            if (!query) {
+                alert('Please enter a query');
+                return;
+            }
+            
+            if (!ws || ws.readyState !== WebSocket.OPEN) {
+                alert('Not connected to server');
+                return;
+            }
+            
+            if (!isAuthenticated) {
+                alert('Please authenticate first');
+                return;
+            }
+            
+            const startTime = Date.now();
+            const message = {
+                type: 'query',
+                payload: {
+                    sql: query,
+                    params: []
+                },
+                id: Date.now().toString()
+            };
+            
+            log(`Executing query: ${query.substring(0, 50)}...`);
+            ws.send(JSON.stringify(message));
+            
+            // Store start time for performance tracking
+            window.queryStartTime = startTime;
+        }
+        
+        function handleMessage(message) {
+            const resultsEl = document.getElementById('queryResults');
+            const endTime = Date.now();
+            const duration = window.queryStartTime ? endTime - window.queryStartTime : 0;
+            
+            switch (message.type) {
+                case 'result':
+                    // Handle authentication success
+                    if (message.payload.user) {
+                        isAuthenticated = true;
+                        currentUser = message.payload.user;
+                        document.getElementById('authPanel').style.display = 'none';
+                        document.getElementById('executeBtn').disabled = false;
+                        
+                        log(`✅ Authenticated as ${currentUser.username} (${currentUser.role})`);
+                        log(`Permissions: ${currentUser.permissions.join(', ')}`);
+                        
+                        // Update status to show user info
+                        const statusEl = document.getElementById('connectionStatus');
+                        statusEl.innerHTML = `✅ Connected as <strong>${currentUser.username}</strong> (${currentUser.role})`;
+                        
+                        return;
+                    }
+                    
+                    // Handle query results
+                    if (message.payload.rows !== undefined) {
+                        queryCount++;
+                        totalTime += duration;
+                        
+                        if (message.payload.fromCache) {
+                            cacheHits++;
+                        } else {
+                            cacheMisses++;
+                        }
+                        
+                        const resultText = JSON.stringify(message.payload.rows, null, 2);
+                        resultsEl.textContent = `Query executed in ${duration}ms\nServer time: ${message.payload.executionTime}ms\n${message.payload.fromCache ? '(from cache)\n' : ''}\nResults (${message.payload.rowCount} rows):\n${resultText}`;
+                        
+                        log(`Query completed in ${duration}ms${message.payload.fromCache ? ' (cached)' : ''}, returned ${message.payload.rowCount} rows`);
+                        updateMetrics();
+                    }
+                    break;
+                    
+                case 'error':
+                    resultsEl.textContent = `Error: ${message.payload.message || message.payload.code}`;
+                    log(`❌ ${message.payload.message || message.payload.code}`);
+                    
+                    // Handle authentication errors
+                    if (message.payload.code === 'AUTH_ERROR' || message.payload.code === 'AUTH_REQUIRED') {
+                        isAuthenticated = false;
+                        document.getElementById('authPanel').style.display = 'block';
+                        document.getElementById('executeBtn').disabled = true;
+                    }
+                    break;
+                    
+                case 'performance':
+                    updatePerformanceMetrics(message.data);
+                    break;
+                    
+                default:
+                    log(`Unknown message type: ${message.type}`);
+            }
+        }
+        
+        function updateMetrics() {
+            document.getElementById('queryCount').textContent = queryCount;
+            document.getElementById('avgTime').textContent = queryCount > 0 ? Math.round(totalTime / queryCount) + 'ms' : '0ms';
+            
+            const totalCacheAttempts = cacheHits + cacheMisses;
+            const hitRate = totalCacheAttempts > 0 ? Math.round((cacheHits / totalCacheAttempts) * 100) : 0;
+            document.getElementById('cacheHitRate').textContent = hitRate + '%';
+        }
+        
+        function updatePerformanceMetrics(data) {
+            if (data.connectionPool) {
+                const pool = data.connectionPool;
+                document.getElementById('connectionPool').textContent = `${pool.total - pool.idle}/${pool.total}`;
+            }
+        }
+        
+        function log(message) {
+            const logEl = document.getElementById('activityLog');
+            const timestamp = new Date().toLocaleTimeString();
+            logEl.textContent += `[${timestamp}] ${message}\n`;
+            logEl.scrollTop = logEl.scrollHeight;
+        }
+        
+        function clearLog() {
+            document.getElementById('activityLog').textContent = '';
+        }
+        
+        // Initialize connection when page loads
+        window.addEventListener('load', () => {
+            connectWebSocket();
+            log('Database Playground initialized');
+        });
+    </script>
+</body>
+</html>

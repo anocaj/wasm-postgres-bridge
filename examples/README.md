@@ -128,9 +128,53 @@ The new examples demonstrate this complete architecture:
 - ✅ `wasm-functions/` - WASM function examples (Task 4) - **COMPLETED**
 - ✅ `complete-flow/` - End-to-end integration examples (Task 6) - **COMPLETED**
 
+## New Advanced Examples
+
+### Performance Monitoring Demo (Node.js)
+**File:** `performance-monitoring-demo.ts`
+
+A comprehensive demonstration of the advanced performance monitoring features:
+
+```bash
+# Run the performance monitoring demo
+npx ts-node examples/performance-monitoring-demo.ts
+
+# Show help
+npx ts-node examples/performance-monitoring-demo.ts help
+```
+
+**Features:**
+- ✅ Query performance tracking and analysis
+- ✅ Cache hit rate monitoring and optimization
+- ✅ Connection pool utilization tracking
+- ✅ Memory usage monitoring and alerts
+- ✅ Automated health checks and reporting
+- ✅ Stress testing and concurrent query handling
+- ✅ Performance report generation
+
+### Database Playground (Browser)
+**File:** `database-playground.html`
+
+An interactive web-based database query interface with real-time monitoring:
+
+```bash
+# Start the WebSocket server first
+npm run dev:websocket
+
+# Then open the playground in browser
+open examples/database-playground.html
+```
+
+**Features:**
+- ✅ Interactive SQL query builder with templates
+- ✅ Real-time performance metrics display
+- ✅ Query result visualization
+- ✅ Activity logging and monitoring
+- ✅ Connection status indicators
+- ✅ Cache performance tracking
+
 ## Planned Examples
 
-- `database-playground/` - Interactive database query examples (Task 2)
 - `websocket-chat/` - WebSocket communication examples (Task 3)
 
 ## Troubleshooting

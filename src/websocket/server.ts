@@ -278,14 +278,14 @@ export class BasicWebSocketServer implements WebSocketServer {
     try {
       // Basic SQL injection prevention (for learning purposes)
       const sql = message.payload.sql.toLowerCase().trim();
-      const dangerousKeywords = ['drop', 'delete', 'truncate', 'alter', 'create', 'insert', 'update'];
+      const dangerousKeywords = ['drop', 'truncate', 'alter'];
       const hasDangerousKeyword = dangerousKeywords.some(keyword => sql.includes(keyword));
       
       if (hasDangerousKeyword) {
         this.sendToClient(ws, {
           type: 'error',
           payload: { 
-            message: 'Query contains potentially dangerous SQL keywords. Only SELECT queries are allowed for safety.',
+            message: 'Query contains potentially dangerous SQL keywords (DROP, TRUNCATE, ALTER not allowed).',
             code: 'DANGEROUS_SQL',
             sql: message.payload.sql
           },
@@ -294,12 +294,15 @@ export class BasicWebSocketServer implements WebSocketServer {
         return;
       }
 
-      // Validate that it's a SELECT query
-      if (!sql.startsWith('select')) {
+      // Allow SELECT, INSERT, UPDATE, DELETE but not structural changes
+      const allowedStarts = ['select', 'insert', 'update', 'delete'];
+      const isAllowed = allowedStarts.some(start => sql.startsWith(start));
+      
+      if (!isAllowed) {
         this.sendToClient(ws, {
           type: 'error',
           payload: { 
-            message: 'Only SELECT queries are allowed for safety.',
+            message: 'Only SELECT, INSERT, UPDATE, DELETE queries are allowed for safety.',
             code: 'INVALID_QUERY_TYPE',
             sql: message.payload.sql
           },
