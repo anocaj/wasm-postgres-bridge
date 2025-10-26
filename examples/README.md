@@ -125,8 +125,8 @@ The new examples demonstrate this complete architecture:
 
 ## Completed Examples
 
-- ✅ `wasm-functions/` - WASM function examples (Task 4) - **COMPLETED**
-- ✅ `complete-flow/` - End-to-end integration examples (Task 6) - **COMPLETED**
+- ✅ `wasm-functions/` - WASM function examples - **COMPLETED**
+- ✅ `complete-flow/` - End-to-end integration examples  - **COMPLETED**
 
 ## New Advanced Examples
 
@@ -175,7 +175,7 @@ open examples/database-playground.html
 
 ## Planned Examples
 
-- `websocket-chat/` - WebSocket communication examples (Task 3)
+- `websocket-chat/` - WebSocket communication examples
 
 ## Troubleshooting
 

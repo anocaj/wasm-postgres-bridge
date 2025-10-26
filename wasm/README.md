@@ -2,9 +2,9 @@
 
 This directory will contain the Rust source code for the WebAssembly module.
 
-## Setup (Task 4.1)
+## Setup 
 
-The WASM module will be created in Task 4.1 with the following structure:
+The WASM module will be created with the following structure:
 
 ```
 wasm/
@@ -23,5 +23,3 @@ wasm/
 
 - `wasm-pack build --target web` - Build for web browsers
 - `wasm-pack build --target nodejs` - Build for Node.js
-
-The WASM module will be implemented in Task 4.2.

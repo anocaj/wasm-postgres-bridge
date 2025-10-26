@@ -1,7 +1,7 @@
 /**
  * Full system integration tests
- * Task 5.3: WebSocket-Database integration tests
- * Task 6.3: Complete WASM integration tests (to be implemented later)
+ * WebSocket-Database integration tests
+ * Complete WASM integration tests (to be implemented later)
  */
 
 import { WasmDatabaseBridge } from '../src/integration/bridge';

@@ -1,6 +1,6 @@
 /**
  * WASM-WebSocket-Database bridge
- * Completed in task 6.1 - provides integration between WASM, WebSocket, and Database
+ * provides integration between WASM, WebSocket, and Database
  */
 
 import { WebSocketMessage, BasicWebSocketServer } from '../websocket/server';

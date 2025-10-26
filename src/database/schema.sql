@@ -1,5 +1,4 @@
 -- Database schema for WASM-PostgreSQL learning project
--- This schema will be used in task 2.2
 
 -- Simple learning schema
 CREATE TABLE IF NOT EXISTS users (

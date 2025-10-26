@@ -3,7 +3,7 @@
 /**
  * WebSocket Server Demo
  * 
- * This script demonstrates the WebSocket server functionality implemented in task 3.
+ * This script demonstrates the WebSocket server functionality implemented.
  * Run this script and then open src/websocket/client.html in your browser to test.
  * 
  * Usage:
@@ -19,7 +19,7 @@ async function runWebSocketDemo() {
   const PORT = 8080;
 
   console.log('🚀 Starting WebSocket Server Demo...');
-  console.log('📋 This demo shows the WebSocket communication layer from task 3');
+  console.log('📋 This demo shows the WebSocket communication layer');
   console.log('');
 
   try {

@@ -90,7 +90,7 @@ if (allGood) {
   console.log('\nNext steps:');
   console.log('1. Copy .env.example to .env');
   console.log('2. Run ./scripts/setup-db.sh to start PostgreSQL');
-  console.log('3. Begin implementing Task 2.1 (Database client)');
+  console.log('3. Begin implementing Database client');
 } else {
   console.log('❌ Project setup is incomplete. Please fix the missing items above.');
   process.exit(1);

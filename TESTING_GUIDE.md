@@ -1,6 +1,6 @@
 # WebSocket-Database Integration Testing Guide
 
-This guide shows you how to test the WebSocket-Database integration that was implemented in Task 5.
+This guide shows you how to test the WebSocket-Database integration that was implemented.
 
 ## Prerequisites
 
@@ -186,6 +186,6 @@ CREATE TABLE posts (
 ## Next Steps
 
 This WebSocket-Database integration provides the foundation for:
-- Task 6: WASM integration with the database bridge
+- WASM integration with the database bridge
 - Real-time query execution from WebAssembly modules
 - Complete end-to-end data flow testing
